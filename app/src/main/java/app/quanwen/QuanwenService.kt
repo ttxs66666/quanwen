@@ -9,30 +9,22 @@ import android.graphics.Point
 import android.hardware.display.DisplayManager
 import android.os.Handler
 import android.os.Looper
-import android.util.Base64
 import android.view.Display
 import android.view.Surface
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.widget.Toast
-import org.json.JSONArray
-import org.json.JSONObject
-import java.util.concurrent.Executors
 
 /**
  * 整个 App 的核心：一个无障碍服务。
- * 它负责悬浮条、截屏、圈选层、回答卡片，以及调模型。
+ * 它负责悬浮条、截屏、圈选层和回答卡片；提问和追问交给 [Engine]。
  * 截屏用无障碍服务自带的 takeScreenshot（Android 11+），在系统设置里开一次就行。
  */
 class QuanwenService : AccessibilityService() {
 
     lateinit var wm: WindowManager
         private set
-    lateinit var store: QaStore
-        private set
-    private lateinit var prefs: Prefs
     private val main = Handler(Looper.getMainLooper())
-    private val io = Executors.newCachedThreadPool()
 
     private var bar: FloatBar? = null
     private var card: AnswerCard? = null
@@ -42,9 +34,8 @@ class QuanwenService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         wm = getSystemService(WINDOW_SERVICE) as WindowManager
-        prefs = Prefs(this)
-        prefs.persistBuiltInKey()
-        store = QaStore(this)
+        Engine.init(this)
+        Engine.addListener(onQaChanged)
         bar = FloatBar(this).also { it.show() }
         card = AnswerCard(this)
         instance = this
@@ -66,6 +57,7 @@ class QuanwenService : AccessibilityService() {
 
     private fun teardown() {
         if (instance === this) instance = null
+        Engine.removeListener(onQaChanged)
         lasso?.dismiss(); lasso = null
         bar?.remove(); bar = null
         card?.remove(); card = null
@@ -93,7 +85,8 @@ class QuanwenService : AccessibilityService() {
     /** 设置页改了语言之后调用。 */
     fun refreshLabels() = card?.applyStrings()
 
-    fun reloadStore() { store.reload(); card?.let { if (it.current != null && store.list.none { q -> q.id == it.current?.id }) it.hide() } }
+    /** 历史记录里删了题之后调用：卡片正显示被删的题就收起来。 */
+    fun onQaDeleted() { card?.let { c -> if (c.current != null && Engine.store.list.none { q -> q.id == c.current?.id }) c.hide() } }
 
     // ---------- 悬浮条按钮 ----------
 
@@ -107,7 +100,7 @@ class QuanwenService : AccessibilityService() {
     fun onCardTap() {
         val c = card ?: return
         if (c.visible) { c.hide(); return }
-        val qa = c.current ?: store.list.lastOrNull()
+        val qa = c.current ?: Engine.store.list.lastOrNull()
         if (qa == null) { toast(str(R.string.no_answer_yet)); return }
         c.show(qa, place = c.current == null)
         bar?.setDot(false)
@@ -155,145 +148,28 @@ class QuanwenService : AccessibilityService() {
         ).also { it.show() }
     }
 
-    // ---------- 提问 ----------
+    // ---------- 提问（交给 Engine） ----------
 
     private fun ask(shot: Bitmap, strokes: List<FloatArray>) {
-        val qa = store.create(prefs.subject, prefs.lang)
         val scale = screenSize().x.toFloat() / shot.width
         val b = ImageUtil.bounds(strokes)
-        qa.bounds = floatArrayOf(b.left * scale, b.top * scale, b.right * scale, b.bottom * scale)
-        val turn = Turn(Turn.KIND_FIRST)
-        qa.turns.add(turn)
-        val history = store.historyText(qa)
-        store.save(qa)
+        val bounds = floatArrayOf(b.left * scale, b.top * scale, b.right * scale, b.bottom * scale)
+        val qa = Engine.ask(shot, strokes, bounds, recycleWhenDone = true)
         card?.show(qa, place = true)
         updateBar()
-        io.execute {
-            try {
-                val (page, crop) = ImageUtil.prepare(shot, strokes)
-                shot.recycle()
-                store.saveImages(qa, page, crop)
-                runFirst(qa, turn, page, crop, history)
-            } catch (e: Exception) {
-                main.post { fail(qa, turn, e.toString()) }
-            }
+    }
+
+    /** Engine 里任何一道题有变化时调用。 */
+    private val onQaChanged: (Qa, Boolean) -> Unit = { qa, finished ->
+        card?.refresh(qa)
+        updateBar()
+        if (finished) {
+            val c = card
+            if (c == null || !c.visible || c.current !== qa) bar?.setDot(true)
         }
     }
 
-    /** 后台线程。 */
-    private fun runFirst(qa: Qa, turn: Turn, page: ByteArray, crop: ByteArray, history: String) {
-        val content = JSONArray()
-            .put(JSONObject().put("type", "input_text").put("text", Prompts.firstTurnText(qa.lang, qa.subject, history)))
-            .put(image(page))
-            .put(JSONObject().put("type", "input_text").put("text", Prompts.zoomLabel(qa.lang)))
-            .put(image(crop))
-        val body = baseBody(qa.lang)
-            .put("input", JSONArray().put(JSONObject().put("role", "user").put("content", content)))
-        streamInto(qa, turn, body)
-    }
-
-    /** 再提示一点 / 揭晓：接在上一轮回答后面（previous_response_id），图片不用重发。 */
-    fun followUp(qa: Qa, kind: String) {
-        if (qa.busy) return
-        val prev = qa.lastResponseId ?: return
-        val turn = Turn(kind)
-        qa.turns.add(turn)
-        card?.refresh(qa)
-        updateBar()
-        val text = if (kind == Turn.KIND_MORE) Prompts.more(qa.lang) else Prompts.reveal(qa.lang)
-        val body = baseBody(qa.lang)
-            .put("previous_response_id", prev)
-            .put("input", JSONArray().put(JSONObject().put("role", "user")
-                .put("content", JSONArray().put(JSONObject().put("type", "input_text").put("text", text)))))
-        io.execute { streamInto(qa, turn, body) }
-    }
-
-    fun retry(qa: Qa, index: Int) {
-        val turn = qa.turns.getOrNull(index) ?: return
-        if (turn.state != Turn.STATE_ERROR || qa.busy) return
-        if (turn.kind == Turn.KIND_FIRST) {
-            turn.state = Turn.STATE_LOADING; turn.error = null; turn.text = ""; turn.raw = ""
-            card?.refresh(qa); updateBar()
-            val history = store.historyText(qa)
-            io.execute {
-                try {
-                    runFirst(qa, turn, store.pageFile(qa).readBytes(), store.cropFile(qa).readBytes(), history)
-                } catch (e: Exception) { main.post { fail(qa, turn, e.toString()) } }
-            }
-        } else {
-            qa.turns.removeAt(index)
-            followUp(qa, turn.kind)
-        }
-    }
-
-    private fun image(bytes: ByteArray) = JSONObject().put("type", "input_image").put("detail", "high")
-        .put("image_url", "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP))
-
-    private fun baseBody(lang: String) = JSONObject()
-        .put("model", prefs.model)
-        .put("instructions", Prompts.system(lang))
-        .put("reasoning", JSONObject().put("effort", prefs.effort))
-
-    /** 后台线程里调用；结果回到主线程更新。 */
-    private fun streamInto(qa: Qa, turn: Turn, body: JSONObject) {
-        val sb = StringBuilder()
-        OpenAi(prefs.baseUrl, prefs.apiKey).stream(body, object : OpenAi.Listener {
-            override fun onDelta(text: String) {
-                sb.append(text)
-                val snap = sb.toString()
-                main.post { applyRaw(qa, turn, snap, finished = false) }
-            }
-
-            override fun onDone(responseId: String?) {
-                val snap = sb.toString()
-                main.post {
-                    turn.responseId = responseId
-                    applyRaw(qa, turn, snap, finished = true)
-                    turn.state = Turn.STATE_DONE
-                    finishTurn(qa)
-                }
-            }
-
-            override fun onError(message: String) { main.post { fail(qa, turn, message) } }
-        })
-    }
-
-    private fun applyRaw(qa: Qa, turn: Turn, raw: String, finished: Boolean) {
-        turn.raw = raw
-        if (turn.kind == Turn.KIND_FIRST) {
-            val (type, title, body) = QaStore.parseFirst(raw, finished)
-            if (type.isNotEmpty()) qa.type = type
-            if (title.isNotEmpty()) qa.title = title
-            when {
-                body != null -> turn.text = body
-                raw.length > 200 && type.isEmpty() -> turn.text = raw.trim()   // 模型没按格式输出，直接显示
-            }
-        } else {
-            turn.text = raw.trim()
-        }
-        if (turn.text.isNotEmpty()) turn.state = Turn.STATE_STREAMING
-        card?.refresh(qa)
-    }
-
-    private fun finishTurn(qa: Qa) {
-        store.save(qa)
-        card?.refresh(qa)
-        updateBar()
-        val c = card
-        if (c == null || !c.visible || c.current !== qa) bar?.setDot(true)
-    }
-
-    private fun fail(qa: Qa, turn: Turn, message: String) {
-        turn.state = Turn.STATE_ERROR
-        turn.error = message
-        store.save(qa)
-        card?.refresh(qa)
-        updateBar()
-        val c = card
-        if (c == null || !c.visible || c.current !== qa) bar?.setDot(true)
-    }
-
-    private fun updateBar() = bar?.setBusy(store.list.any { it.busy })
+    private fun updateBar() = bar?.setBusy(Engine.anyBusy)
 
     companion object {
         @Volatile

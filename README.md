@@ -26,12 +26,16 @@
 - 截图时悬浮条和卡片都会先隐藏，不会被截进去。
 - 回答卡片可以拖动，能显示 LaTeX 公式，能翻看这次学习里的其他回答。
 - 同一次学习里前面问过的内容会一并交给 AI，它会接着往下讲。
+- **App 内圈题**：不用悬浮条，开不了无障碍的系统（比如鸿蒙的卓易通）也能用。
+  - 分屏，一半笔记、一半圈问。用系统截屏后，圈问会自动载入这张最新截图，在圈问里直接圈题。
+  - 也可以从相册选图，或者拍一张纸质笔记来圈。
+  - 双指可以缩放。长按桌面图标有「圈最新截图」「拍照圈题」两个快捷方式。
 - 有历史记录，界面中英双语，应用内可以检查更新。
 
 ### 安装
 
 1. 到 [Releases](https://github.com/ttxs66666/quanwen/releases) 下载最新的 `quanwen-v*.apk`，在平板上安装。需要 Android 11 及以上。
-2. 打开「圈问」，点「打开无障碍设置」，把「圈问悬浮条」打开。如果开关是灰的，先点「应用信息」，在右上角菜单里选「允许受限设置」。
+2. 打开「圈问」，点「打开无障碍设置」，把「圈问悬浮条」打开。如果开关是灰的，先点「应用信息」，在右上角菜单里选「允许受限设置」。实在开不了，就用「App 内圈题」。
 3. 在设置页填入你自己的 OpenAI API Key，点「测试连接」。安装包里不带任何密钥。
 4. 以后在设置页点「检查更新」就能升级，本机保存的密钥和记录都不会丢。
 
@@ -82,12 +86,16 @@ The point: you ask the questions and do the reasoning; the AI only nudges you wh
 - The bar and card hide themselves before the screenshot, so they never appear in it.
 - The answer card is draggable, renders LaTeX, and lets you page through the other answers from the session.
 - Earlier questions from the same session are passed to the AI, so it can build on them.
+- **Circle in the app**: no float bar needed, so it also works where accessibility can't be turned on (for example HarmonyOS with Zhuoyitong).
+  - Split the screen with notes on one half and Quanwen on the other. Take a system screenshot and Quanwen loads it automatically, then circle right there.
+  - You can also pick an image from the gallery or photograph paper notes.
+  - Pinch to zoom. Long-press the launcher icon for the "Circle latest screenshot" and "Circle a photo" shortcuts.
 - History, a Chinese/English interface, and in-app updates.
 
 ### Install
 
 1. Download the latest `quanwen-v*.apk` from [Releases](https://github.com/ttxs66666/quanwen/releases) and install it on your tablet. Android 11 or later is required.
-2. Open Quanwen, tap "Accessibility settings" and turn on "Quanwen float bar". If the switch is greyed out, open App info and choose "Allow restricted settings" from the top-right menu.
+2. Open Quanwen, tap "Accessibility settings" and turn on "Quanwen float bar". If the switch is greyed out, open App info and choose "Allow restricted settings" from the top-right menu. If it still can't be turned on, use "Circle in the app".
 3. Enter your own OpenAI API key in Settings and tap "Test connection". The APK ships without any key.
 4. Later, tap "Check for updates" in Settings to upgrade. Your saved key and history stay on the device.
 

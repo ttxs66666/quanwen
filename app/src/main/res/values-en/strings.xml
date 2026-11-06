@@ -39,6 +39,21 @@
     <string name="api_key_hint">Your OpenAI API key</string>
     <string name="no_key">No API key yet: enter your OpenAI key above, then tap Test connection.</string>
 
+    <string name="sec_in_app">Without the float bar: circle in the app</string>
+    <string name="in_app_help">Works even where accessibility can\'t be turned on (for example HarmonyOS with Zhuoyitong). Split the screen: notes on one half, Quanwen on the other. Take a system screenshot and Quanwen loads it automatically, then circle right here. You can also pick an image from the gallery or photograph paper notes.</string>
+    <string name="src_latest">Latest screenshot</string>
+    <string name="src_pick">Gallery</string>
+    <string name="src_camera">Camera</string>
+    <string name="circle_hint">Circle your question; pinch to zoom. New screenshots load automatically.</string>
+    <string name="circle_empty">Load an image with the buttons above: the latest screenshot, a picture from the gallery, or a photo of paper notes.</string>
+    <string name="latest_loaded">Loaded the latest screenshot</string>
+    <string name="no_screenshot">No screenshot found</string>
+    <string name="need_photo_permission">Photo access is needed to read the latest screenshot; you can also pick one from the gallery.</string>
+    <string name="load_failed">Couldn\'t open the image</string>
+    <string name="no_camera">No camera app found</string>
+    <string name="shortcut_latest">Circle latest screenshot</string>
+    <string name="shortcut_camera">Circle a photo</string>
+
     <string name="sec_update">Updates</string>
     <string name="version_now">Version %1$s (build %2$d)</string>
     <string name="check_update">Check for updates</string>

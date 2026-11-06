@@ -143,6 +143,15 @@ class MainActivity : Activity() {
             },
         ))
 
+        // App 内圈题（无障碍开不了时用）
+        section(getString(R.string.sec_in_app))
+        col.addView(text(getString(R.string.in_app_help), 13f, Colors.MUTED).apply { setPadding(0, 0, 0, dpi(8f)) })
+        col.addView(row(
+            button(getString(R.string.src_latest)) { CircleActivity.open(this, CircleActivity.SOURCE_LATEST) },
+            button(getString(R.string.src_pick)) { CircleActivity.open(this, CircleActivity.SOURCE_PICK) },
+            button(getString(R.string.src_camera)) { CircleActivity.open(this, CircleActivity.SOURCE_CAMERA) },
+        ))
+
         // 更新
         section(getString(R.string.sec_update))
         col.addView(text(getString(R.string.version_now, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE), 14f, Colors.INK))

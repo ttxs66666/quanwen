@@ -35,7 +35,8 @@ class HistoryActivity : Activity() {
         super.onCreate(savedInstanceState)
         window.statusBarColor = Colors.PAPER
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-        store = QaStore(this)
+        Engine.init(this)
+        store = Engine.store
         val list = ListView(this).apply {
             setBackgroundColor(Colors.PAPER)
             divider = null
@@ -52,7 +53,7 @@ class HistoryActivity : Activity() {
             AlertDialog.Builder(this).setMessage(R.string.delete_confirm)
                 .setPositiveButton(R.string.delete) { _, _ ->
                     store.delete(qa); adapter.notifyDataSetChanged()
-                    QuanwenService.instance?.reloadStore()
+                    QuanwenService.instance?.onQaDeleted()
                 }
                 .setNegativeButton(R.string.cancel, null).show()
             true
@@ -108,7 +109,8 @@ class DetailActivity : Activity() {
         super.onCreate(savedInstanceState)
         window.statusBarColor = Colors.PAPER
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-        val store = QaStore(this)
+        Engine.init(this)
+        val store = Engine.store
         val qa = store.list.firstOrNull { it.id == intent.getStringExtra("id") } ?: run { finish(); return }
         val web = WebView(this).apply { setBackgroundColor(Colors.PAPER); settings.javaScriptEnabled = true }
         setContentView(web)
