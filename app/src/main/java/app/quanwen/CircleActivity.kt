@@ -2,6 +2,8 @@ package app.quanwen
 
 import android.Manifest
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ContentProvider
 import android.content.ContentUris
 import android.content.ContentValues
@@ -21,6 +23,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
+import android.view.DragEvent
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -41,6 +44,7 @@ class CircleActivity : Activity() {
     private lateinit var content: LinearLayout
     private lateinit var empty: TextView
     private lateinit var hint: TextView
+    private lateinit var dropHint: TextView
     private val main = Handler(Looper.getMainLooper())
 
     /** 正在跟随最新截图：有新截图就自动换上。 */
@@ -91,6 +95,7 @@ class CircleActivity : Activity() {
         bar.addView(button(getString(R.string.src_latest)) { latest(userAsked = true) })
         bar.addView(button(getString(R.string.src_pick)) { pick() })
         bar.addView(button(getString(R.string.src_camera)) { camera() })
+        bar.addView(button(getString(R.string.src_paste)) { paste() })
         hint = TextView(this).apply {
             textSize = 13f; setTextColor(Colors.MUTED); setPadding(dpi(12f), 0, 0, 0)
             text = getString(R.string.circle_hint); maxLines = 2
@@ -107,6 +112,14 @@ class CircleActivity : Activity() {
             gravity = Gravity.CENTER; setPadding(dpi(32f), dpi(32f), dpi(32f), dpi(32f))
         }
         canvasBox.addView(empty, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        dropHint = TextView(this).apply {
+            text = getString(R.string.drop_hint); textSize = 18f; setTextColor(Colors.ACCENT)
+            gravity = Gravity.CENTER; visibility = View.GONE
+            background = rounded(0xE6FFFDF8.toInt(), dp(14f), Colors.ACCENT, dpi(3f))
+        }
+        canvasBox.addView(dropHint, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            .apply { setMargins(dpi(8f), dpi(8f), dpi(8f), dpi(8f)) })
+        setupDrop(canvasBox)
         content.addView(canvasBox)
         answer = AnswerView(this, fill = true, maxBodyHeight = { 0 }, onClose = { answer.visibility = View.GONE; arrange() })
         answer.visibility = View.GONE
@@ -178,6 +191,52 @@ class CircleActivity : Activity() {
         file.parentFile?.mkdirs()
     }
 
+    // ---------- 拖进来、粘贴 ----------
+
+    /**
+     * 把图片拖到画布上就载入（比如截屏后拖动系统的截图缩略图，或者从相册里拖一张）。
+     * 来源千奇百怪（鸿蒙经卓易通转过来的未必标成图片类型），所以什么拖动都先接住，松手时再找里面的图片。
+     */
+    private fun setupDrop(target: View) {
+        target.setOnDragListener { _, e ->
+            when (e.action) {
+                DragEvent.ACTION_DRAG_STARTED -> true
+                DragEvent.ACTION_DRAG_ENTERED -> { dropHint.visibility = View.VISIBLE; true }
+                DragEvent.ACTION_DRAG_EXITED -> { dropHint.visibility = View.GONE; true }
+                DragEvent.ACTION_DROP -> {
+                    dropHint.visibility = View.GONE
+                    val perms = try { requestDragAndDropPermissions(e) } catch (_: Exception) { null }
+                    val uri = firstImageUri(e.clipData)
+                    if (uri == null) { perms?.release(); toast(getString(R.string.drop_failed)); false }
+                    else { followLatest = false; loadInto(uri, -1L, announce = false) { perms?.release() }; true }
+                }
+                DragEvent.ACTION_DRAG_ENDED -> { dropHint.visibility = View.GONE; true }
+                else -> true
+            }
+        }
+    }
+
+    private fun paste() {
+        val cm = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+        val uri = firstImageUri(cm.primaryClip)
+        if (uri == null) { toast(getString(R.string.paste_empty)); return }
+        followLatest = false
+        loadInto(uri, -1L, announce = false)
+    }
+
+    /** 从拖动或剪贴板的内容里找第一个能当图片打开的地址。 */
+    private fun firstImageUri(clip: ClipData?): Uri? {
+        clip ?: return null
+        for (i in 0 until clip.itemCount) {
+            val item = clip.getItemAt(i)
+            item.uri?.let { return it }
+            val t = item.text?.toString()?.trim() ?: continue
+            if (t.startsWith("content://") || t.startsWith("file://")) return Uri.parse(t)
+            if (t.startsWith("/") && File(t).exists()) return Uri.fromFile(File(t))
+        }
+        return null
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
@@ -200,10 +259,11 @@ class CircleActivity : Activity() {
     }
 
     /** 后台解码（大图缩到长边 3200，照片按 EXIF 转正），再显示。 */
-    private fun loadInto(uri: Uri, imageId: Long, announce: Boolean) {
+    private fun loadInto(uri: Uri, imageId: Long, announce: Boolean, onFinished: () -> Unit = {}) {
         Thread {
             val b = try { decode(uri) } catch (e: Exception) { null }
             runOnUiThread {
+                onFinished()
                 if (b == null) { toast(getString(R.string.load_failed)); return@runOnUiThread }
                 loadedImageId = imageId
                 show(b)

@@ -40,17 +40,21 @@
     <string name="no_key">还没有 API Key：在上面填入你的 OpenAI 密钥，再点「测试连接」。</string>
 
     <string name="sec_in_app">不用悬浮条：App 内圈题</string>
-    <string name="in_app_help">无障碍开不了（比如鸿蒙的卓易通）也能用。分屏：一半笔记、一半圈问，用系统截屏后，圈问会自动载入这张最新截图，直接在圈问里圈题。也可以选相册里的图，或者拍一张纸质笔记。</string>
+    <string name="in_app_help">无障碍开不了（比如鸿蒙的卓易通）也能用。分屏：一半笔记、一半圈问，用系统截屏后，圈问会自动载入这张最新截图，直接在圈问里圈题；也可以把截图缩略图直接拖进圈问。还可以选相册里的图、粘贴，或者拍一张纸质笔记。</string>
     <string name="src_latest">最新截图</string>
     <string name="src_pick">相册</string>
     <string name="src_camera">拍照</string>
     <string name="circle_hint">圈出你的问题；双指可以缩放。截了新图会自动换上。</string>
-    <string name="circle_empty">点上面的按钮载入一张图：最新截图、相册里的图，或者拍一张纸质笔记。</string>
+    <string name="circle_empty">点上面的按钮载入一张图：最新截图、相册、拍照或粘贴；也可以把截图直接拖到这里。</string>
     <string name="latest_loaded">已载入最新截图</string>
     <string name="no_screenshot">没找到截图</string>
     <string name="need_photo_permission">需要「照片」权限才能读取最新截图；也可以点「相册」手动选。</string>
     <string name="load_failed">图片打不开</string>
     <string name="no_camera">没有找到相机 App</string>
+    <string name="src_paste">粘贴</string>
+    <string name="paste_empty">剪贴板里没有图片。先复制一张截图，再点「粘贴」。</string>
+    <string name="drop_hint">松手，载入这张图</string>
+    <string name="drop_failed">没拿到图片：这个来源不支持拖进来。试试「最新截图」「相册」或「粘贴」。</string>
     <string name="shortcut_latest">圈最新截图</string>
     <string name="shortcut_camera">拍照圈题</string>
 
