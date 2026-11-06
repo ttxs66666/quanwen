@@ -73,8 +73,9 @@ class MainActivity : Activity() {
                     updateBusy = false
                     if (info != null) {
                         pendingUpdate = info
+                        val notes = localNotes(info.notes)
                         updateText.text = getString(R.string.update_found, info.name, info.code) +
-                            if (info.notes.isNotBlank()) "\n" + info.notes else ""
+                            if (notes.isNotBlank()) "\n" + notes else ""
                         updateText.setTextColor(Colors.INK)
                         updateBtn.text = getString(R.string.download_install)
                     } else if (!silent) updateText.text = getString(R.string.up_to_date)
@@ -83,6 +84,16 @@ class MainActivity : Activity() {
                 runOnUiThread { updateBusy = false; if (!silent) updateText.text = getString(R.string.check_failed) + (e.message ?: e.javaClass.simpleName) }
             }
         }.start()
+    }
+
+    /** 更新说明是「中文 --- English」两段，只显示当前界面语言那一段。 */
+    private fun localNotes(notes: String): String {
+        val parts = notes.split(Regex("\\r?\\n-{3,}\\r?\\n")).map { it.trim() }.filter { it.isNotEmpty() }
+        return when {
+            parts.size < 2 -> notes.trim()
+            prefs.lang == "en" -> parts[1]
+            else -> parts[0]
+        }
     }
 
     private fun downloadAndInstall(info: Updater.Info) {
