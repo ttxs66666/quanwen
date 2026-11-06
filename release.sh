@@ -39,12 +39,20 @@ Co-Authored-By: $CO_AUTHOR"
 git add version.properties
 git commit -q -m "$msg"
 git tag "v$code"
-git push -q
-git push -q origin "v$code"
 
-gh release create "v$code" "dist/quanwen-v$code.apk" --title "$name" --notes "$NOTES_ZH
-
----
-
-$NOTES_EN"
+# 国内网络时通时断：推送和上传失败就重试
+retry() { local n=0; until "$@"; do n=$((n + 1)); [ "$n" -ge 6 ] && return 1; echo "网络出错，第 $n 次重试…"; sleep 3; done; }
+notes_file="$(mktemp)"
+printf '%s\n\n---\n\n%s\n' "$NOTES_ZH" "$NOTES_EN" > "$notes_file"
+publish() {
+  if gh release view "v$code" >/dev/null 2>&1; then
+    gh release upload "v$code" "dist/quanwen-v$code.apk" --clobber
+  else
+    gh release create "v$code" "dist/quanwen-v$code.apk" --title "$name" --notes-file "$notes_file"
+  fi
+}
+retry git push -q
+retry git push -q origin "v$code"
+retry publish
+rm -f "$notes_file"
 echo "已发布 v$code（$name）"
