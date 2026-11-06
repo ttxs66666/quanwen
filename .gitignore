@@ -1,0 +1,15 @@
+# 私密：OpenAI 密钥、签名密钥库，绝不提交
+secrets.properties
+keystore/
+*.jks
+*.keystore
+
+# 本地构建产物
+dist/
+local.properties
+.gradle/
+.kotlin/
+build/
+*/build/
+.idea/
+*.iml

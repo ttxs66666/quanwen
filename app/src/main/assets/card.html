@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<link rel="stylesheet" href="katex/katex.min.css">
+<script src="katex/katex.min.js"></script>
+<style>
+  html, body { margin: 0; padding: 0; background: transparent; }
+  body {
+    font-family: "Noto Serif CJK SC", "Source Han Serif SC", serif;
+    font-size: 16px; line-height: 1.65; color: #2b2b3a;
+    padding: 2px 14px 6px; -webkit-text-size-adjust: none; word-wrap: break-word;
+  }
+  .turn + .turn { margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(0,0,0,.15); }
+  .label { font-family: sans-serif; font-size: 12px; color: #8a8778; letter-spacing: .05em; margin-bottom: 2px; }
+  p { margin: 0 0 .45em; }
+  p:last-child { margin-bottom: 0; }
+  ol, ul { margin: .2em 0 .45em; padding-left: 1.4em; }
+  li { margin: .1em 0; }
+  code { font-family: monospace; font-size: .9em; background: rgba(0,0,0,.05); padding: 0 .25em; border-radius: 3px; }
+  .katex { font-size: 1.05em; }
+  .katex-display { margin: .35em 0; overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
+  .loading { color: #8a8778; font-family: sans-serif; font-size: 14px; }
+  .loading::after { content: "…"; animation: blink 1.2s infinite; }
+  @keyframes blink { 50% { opacity: .2; } }
+  .error { color: #b3261e; font-family: sans-serif; font-size: 13px; }
+  .retry { display: inline-block; margin-top: 6px; color: #d2412f; font-weight: bold; text-decoration: none; }
+  .crop { display: block; max-width: 100%; border-radius: 8px; border: 1px solid rgba(0,0,0,.1); margin: 4px 0 10px; }
+  .meta { font-family: sans-serif; font-size: 12px; color: #8a8778; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+function esc(s) {
+  return s.replace(/[&<>"]/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]; });
+}
+function tex(src, display) {
+  try { return katex.renderToString(src, {displayMode: display, throwOnError: false, output: 'html'}); }
+  catch (e) { return esc(src); }
+}
+// 简单的 Markdown：段落、列表、标题、粗体、行内代码；公式先抽出来交给 KaTeX。
+function md(src) {
+  var maths = [];
+  function keep(html) { maths.push(html); return '\u0001' + (maths.length - 1) + '\u0002'; }
+  // 独立公式单独成块，前后断行，不和段落混在一起（否则会多出空行）
+  function block(html) { return '\n\n' + keep(html) + '\n\n'; }
+  src = src.replace(/\$\$([\s\S]+?)\$\$/g, function (m, a) { return block(tex(a, true)); })
+           .replace(/\\\[([\s\S]+?)\\\]/g, function (m, a) { return block(tex(a, true)); })
+           .replace(/\\\(([\s\S]+?)\\\)/g, function (m, a) { return keep(tex(a, false)); })
+           .replace(/\$([^\$\n]+?)\$/g, function (m, a) { return keep(tex(a, false)); });
+  var lines = esc(src).split('\n');
+  var out = [], para = [], list = null;
+  function inline(s) {
+    return s.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>');
+  }
+  function flushPara() { if (para.length) { out.push('<p>' + inline(para.join('<br>')) + '</p>'); para = []; } }
+  function flushList() { if (list) { out.push('<' + list.tag + '>' + list.items.map(function (i) { return '<li>' + inline(i) + '</li>'; }).join('') + '</' + list.tag + '>'); list = null; } }
+  lines.forEach(function (raw) {
+    var l = raw.replace(/\s+$/, '');
+    var m;
+    if (!l.trim()) { flushPara(); flushList(); return; }
+    if ((m = l.match(/^\s*(\d+)[.)、]\s+(.*)$/))) { flushPara(); if (!list || list.tag !== 'ol') { flushList(); list = {tag: 'ol', items: []}; } list.items.push(m[2]); return; }
+    if ((m = l.match(/^\s*[-*•]\s+(.*)$/))) { flushPara(); if (!list || list.tag !== 'ul') { flushList(); list = {tag: 'ul', items: []}; } list.items.push(m[1]); return; }
+    if ((m = l.match(/^#{1,6}\s+(.*)$/))) { flushPara(); flushList(); out.push('<p><b>' + inline(m[1]) + '</b></p>'); return; }
+    if (/^\s*\u0001\d+\u0002\s*$/.test(l) && maths[+l.replace(/\D/g, '')].indexOf('katex-display') >= 0) {
+      flushPara(); flushList(); out.push('<div>' + l.trim() + '</div>'); return;
+    }
+    flushList(); para.push(l);
+  });
+  flushPara(); flushList();
+  return out.join('').replace(/\u0001(\d+)\u0002/g, function (m, i) { return maths[+i]; });
+}
+function reportHeight() {
+  requestAnimationFrame(function () {
+    var h = document.getElementById('root').getBoundingClientRect().height + 10;
+    if (window.Android) Android.height(h);
+  });
+}
+var lastKey = null, lastCount = 0;
+// payload: {key, turns:[{label,text,state,error}], s:{loading,retry}, image?, meta?}
+function render(json) {
+  var p = JSON.parse(json), html = '';
+  if (p.meta) html += '<div class="meta">' + esc(p.meta) + '</div>';
+  if (p.image) html += '<img class="crop" src="' + p.image + '">';
+  p.turns.forEach(function (t, i) {
+    html += '<div class="turn">';
+    if (t.label) html += '<div class="label">' + esc(t.label) + '</div>';
+    if (t.text) html += md(t.text);
+    if (t.state === 'loading' || (t.state === 'stream' && !t.text)) html += '<div class="loading">' + esc(p.s.loading) + '</div>';
+    if (t.state === 'error') html += '<div class="error">' + esc(t.error) + '<br><a class="retry" href="#" onclick="Android.retry(' + i + ');return false;">' + esc(p.s.retry) + '</a></div>';
+    html += '</div>';
+  });
+  document.getElementById('root').innerHTML = html;
+  reportHeight();
+  // 多了一段回答（再提示 / 揭晓）时，滚到这一段的开头
+  if (p.key !== lastKey) { lastKey = p.key; lastCount = p.turns.length; }
+  else if (p.turns.length > lastCount) {
+    lastCount = p.turns.length;
+    var turns = document.querySelectorAll('.turn');
+    var t = turns[turns.length - 1];
+    setTimeout(function () { window.scrollTo(0, t.offsetTop - 4); }, 60);
+  }
+  var imgs = document.querySelectorAll('img');
+  for (var k = 0; k < imgs.length; k++) imgs[k].onload = reportHeight;
+}
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(reportHeight);
+</script>
+</body>
+</html>

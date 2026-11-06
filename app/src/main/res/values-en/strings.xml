@@ -1,0 +1,61 @@
+<resources>
+    <string name="app_name">Quanwen</string>
+    <string name="service_label">Quanwen float bar</string>
+    <string name="service_desc">Shows the circle/card float bar. The screen is captured only when you tap the circle button, so you can circle a question and send it to the AI.</string>
+
+    <string name="lasso_hint">Circle your question</string>
+    <string name="lasso_sending">Sends when you pause; keep drawing to extend the circle</string>
+    <string name="lasso_redo">Redo</string>
+    <string name="lasso_cancel">Cancel</string>
+
+    <string name="btn_more">A bit more</string>
+    <string name="btn_reveal">Reveal</string>
+    <string name="label_more">More</string>
+    <string name="label_reveal">Reveal</string>
+    <string name="thinking">Thinking</string>
+    <string name="reading">Reading what you circled</string>
+    <string name="retry">Retry</string>
+    <string name="no_answer_yet">No answers yet. Tap the circle button and circle a question first.</string>
+    <string name="capture_failed">Screenshot failed</string>
+
+    <string name="main_tagline">Circle a question, tap once, and get just the hint you need right now.</string>
+    <string name="status_on">Float bar is on</string>
+    <string name="status_off">Float bar is off</string>
+    <string name="a11y_help">Turn on \"Quanwen float bar\" in the system accessibility settings. If the switch is greyed out, open App info, choose \"Allow restricted settings\" from the top-right menu, then come back and turn it on.</string>
+    <string name="open_a11y">Accessibility settings</string>
+    <string name="open_app_info">App info</string>
+    <string name="sec_study">Study</string>
+    <string name="subject">Current subject</string>
+    <string name="subject_hint">e.g. Operations research</string>
+    <string name="new_session">Start a new session</string>
+    <string name="new_session_done">New session started; earlier questions will no longer be sent as context</string>
+    <string name="history">History</string>
+    <string name="sec_lang">Language</string>
+    <string name="sec_model">Model</string>
+    <string name="model">Model name</string>
+    <string name="effort">Reasoning effort</string>
+    <string name="base_url">Base URL</string>
+    <string name="api_key">API key</string>
+    <string name="api_key_hint">Your OpenAI API key</string>
+    <string name="no_key">No API key yet: enter your OpenAI key above, then tap Test connection.</string>
+
+    <string name="sec_update">Updates</string>
+    <string name="version_now">Version %1$s (build %2$d)</string>
+    <string name="check_update">Check for updates</string>
+    <string name="checking">Checking…</string>
+    <string name="up_to_date">You have the latest version</string>
+    <string name="update_found">New version: %1$s (build %2$d)</string>
+    <string name="download_install">Download and install</string>
+    <string name="downloading">Downloading %1$d%%</string>
+    <string name="installing">Downloaded, installing…</string>
+    <string name="allow_install">Allow Quanwen to install apps on the page that opens, then come back and tap Download and install again.</string>
+    <string name="check_failed">Check failed: </string>
+    <string name="update_failed">Update failed:</string>
+    <string name="test">Test connection</string>
+    <string name="testing">Testing…</string>
+    <string name="test_ok">Connected · %1$s · %2$.1fs</string>
+    <string name="history_empty">Nothing yet. Tap the circle button on the float bar and circle a question.</string>
+    <string name="delete">Delete</string>
+    <string name="delete_confirm">Delete this entry?</string>
+    <string name="cancel">Cancel</string>
+</resources>
