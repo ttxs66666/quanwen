@@ -25,7 +25,7 @@
 - **悬浮条**有两个按钮：「圈」用来截图圈题；「卡」用来显示或隐藏回答卡片，关掉的卡片随时能再打开。
 - 截图时悬浮条和卡片都会先隐藏，不会被截进去。
 - 回答卡片可以拖动，能显示 LaTeX 公式，能翻看这次学习里的其他回答。
-- 同一次学习里前面问过的内容会一并交给 AI，它会接着往下讲。
+- **会话**：回答面板右上角的 ☰ 可以新建会话、切换会话。新圈的题只进当前会话，AI 也只参考当前会话里前面的问答，复习一门、再学另一门，互不干扰。
 - **App 内圈题**：不用悬浮条，开不了无障碍的系统（比如鸿蒙的卓易通）也能用。
   - 分屏，一半笔记、一半圈问。点圈题页的「截屏」，圈问会截下笔记那一半（自动去掉圈问自己那半屏），截图只临时用，不存相册。也可以用系统截屏，圈问会自动载入最新截图。
   - 也可以把截图（或别的 App 里的图片）直接拖进圈问；还可以从相册选图、粘贴，或者拍一张纸质笔记来圈。
@@ -85,7 +85,7 @@ The point: you ask the questions and do the reasoning; the AI only nudges you wh
 - **Floating bar** with two buttons: "circle" captures the screen so you can circle a question; "card" shows or hides the answer card, so a closed card can be reopened any time.
 - The bar and card hide themselves before the screenshot, so they never appear in it.
 - The answer card is draggable, renders LaTeX, and lets you page through the other answers from the session.
-- Earlier questions from the same session are passed to the AI, so it can build on them.
+- **Sessions**: the ☰ button at the top right of the answer panel creates or switches sessions. New questions go into the current session, and the AI only builds on earlier questions from that session, so reviewing one subject and then studying another don't mix.
 - **Circle in the app**: no float bar needed, so it also works where accessibility can't be turned on (for example HarmonyOS with Zhuoyitong).
   - Split the screen with notes on one half and Quanwen on the other. Tap Screenshot on the circle page and Quanwen captures the notes half (cropping out its own half); the capture is temporary and never saved to the gallery. A system screenshot also works: Quanwen loads the latest one automatically.
   - You can also drag a screenshot (or an image from another app) straight into Quanwen, pick one from the gallery, paste one, or photograph paper notes.

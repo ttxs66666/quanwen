@@ -57,10 +57,10 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("stylusSeen", false)
         set(v) = sp.edit().putBoolean("stylusSeen", v).apply()
 
-    /** 早于这个时间的问答不算进当前会话（「开始新会话」）。 */
-    var sessionBreakAt: Long
-        get() = sp.getLong("sessionBreakAt", 0L)
-        set(v) = sp.edit().putLong("sessionBreakAt", v).apply()
+    /** 当前会话。新圈的题都放进它，AI 也只参考它里面的问答。会话由用户手动新建、切换。 */
+    var currentSessionId: String
+        get() = sp.getString("currentSessionId", "") ?: ""
+        set(v) = sp.edit().putString("currentSessionId", v).apply()
 
     companion object {
         const val DEFAULT_MODEL = "gpt-6.1-terra"

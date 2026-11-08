@@ -52,8 +52,17 @@ class AnswerView(
     private val prevBtn = iconBtn("‹") { step(-1) }
     private val posText = TextView(ctx).apply { textSize = 12f; setTextColor(Colors.MUTED) }
     private val nextBtn = iconBtn("›") { step(1) }
+    private val menuBtn = iconBtn("☰") { if (sessionsShown) hideSessions() else showSessions() }
     private val closeBtn = iconBtn("×") { onClose() }
     private val web = WebView(ctx)
+    private val footer = LinearLayout(ctx)
+    /** 会话列表（点 ☰ 打开），盖在正文的位置上。 */
+    private val sessionScroll = android.widget.ScrollView(ctx).apply { visibility = View.GONE }
+    private val sessionList = LinearLayout(ctx).apply { orientation = VERTICAL; setPadding(ctx.dpi(8f), ctx.dpi(4f), ctx.dpi(8f), ctx.dpi(8f)) }
+    private var sessionsShown = false
+    /** 当前是不是「新会话、还没有题」的空白状态。 */
+    var emptyShown = false
+        private set
     private val moreBtn = footerBtn()
     private val revealBtn = footerBtn()
 
@@ -67,8 +76,11 @@ class AnswerView(
 
         header.addView(chip)
         header.addView(title, LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        header.addView(prevBtn); header.addView(posText); header.addView(nextBtn); header.addView(closeBtn)
+        header.addView(prevBtn); header.addView(posText); header.addView(nextBtn); header.addView(menuBtn); header.addView(closeBtn)
         addView(header)
+        sessionScroll.addView(sessionList)
+        addView(sessionScroll, if (fill) LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+                               else LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ctx.dpi(200f)))
 
         web.setBackgroundColor(Color.TRANSPARENT)
         web.settings.javaScriptEnabled = true
@@ -81,10 +93,8 @@ class AnswerView(
         addView(web, if (fill) LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
                      else LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ctx.dpi(60f)))
 
-        val footer = LinearLayout(ctx).apply {
-            orientation = HORIZONTAL
-            setPadding(ctx.dpi(10f), ctx.dpi(4f), ctx.dpi(10f), ctx.dpi(10f))
-        }
+        footer.orientation = HORIZONTAL
+        footer.setPadding(ctx.dpi(10f), ctx.dpi(4f), ctx.dpi(10f), ctx.dpi(10f))
         footer.addView(moreBtn, LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = ctx.dpi(8f) })
         footer.addView(revealBtn, LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         moreBtn.setOnClickListener { current?.let { Engine.followUp(it, Turn.KIND_MORE) } }
@@ -101,7 +111,74 @@ class AnswerView(
         renderHeader()
     }
 
-    fun showQa(qa: Qa) { current = qa; render() }
+    fun showQa(qa: Qa) {
+        if (sessionsShown) hideSessions()
+        current = qa; emptyShown = false; render()
+    }
+
+    /** 新会话、还没有题时显示的空白状态（仍然可以点 ☰ 切回别的会话）。 */
+    fun showEmpty() {
+        if (sessionsShown) hideSessions()
+        current = null; emptyShown = true; render()
+    }
+
+    // ---------- 会话列表 ----------
+
+    fun showSessions() {
+        sessionsShown = true
+        sessionList.removeAllViews()
+        sessionList.addView(sessionRow(loc.getString(R.string.session_new), "", Colors.ACCENT, bold = true) {
+            Engine.store.newSession(); showEmpty()
+        })
+        val cur = Engine.store.currentSessionId
+        val fmt = java.text.SimpleDateFormat("M/d HH:mm", java.util.Locale.getDefault())
+        for (sn in Engine.store.sessions().take(30)) {
+            val isCur = sn.id == cur
+            val name = plainMath(sn.title).ifBlank { loc.getString(R.string.session_untitled) }
+            val meta = listOf(
+                if (isCur) loc.getString(R.string.session_current) else "",
+                loc.getString(R.string.session_count, sn.qas.size),
+                sn.subject,
+                fmt.format(java.util.Date(sn.lastTime)),
+            ).filter { it.isNotBlank() }.joinToString(" · ")
+            sessionList.addView(sessionRow(name, meta, if (isCur) Colors.INK else Colors.MUTED, bold = isCur) {
+                Engine.store.switchSession(sn.id)
+                val last = sn.qas.lastOrNull()
+                if (last != null) showQa(last) else showEmpty()
+            })
+        }
+        web.visibility = View.GONE; footer.visibility = View.GONE
+        if (!fill) {
+            val lp = sessionScroll.layoutParams
+            lp.height = minOf(maxBodyHeight(), ctx.dpi(58f) * sessionList.childCount + ctx.dpi(16f))
+            sessionScroll.layoutParams = lp
+        }
+        sessionScroll.visibility = View.VISIBLE
+        sessionScroll.scrollTo(0, 0)
+        renderHeader()
+        onResized()
+    }
+
+    private fun hideSessions() {
+        sessionsShown = false
+        sessionScroll.visibility = View.GONE
+        web.visibility = View.VISIBLE; footer.visibility = View.VISIBLE
+        render()
+        onResized()
+    }
+
+    private fun sessionRow(name: String, meta: String, color: Int, bold: Boolean, onClick: () -> Unit) = LinearLayout(ctx).apply {
+        orientation = VERTICAL
+        setPadding(ctx.dpi(10f), ctx.dpi(8f), ctx.dpi(10f), ctx.dpi(8f))
+        background = rounded(0x08000000, ctx.dp(10f))
+        layoutParams = LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = ctx.dpi(6f) }
+        addView(TextView(ctx).apply {
+            text = name; textSize = 15f; setTextColor(color); maxLines = 1; ellipsize = TextUtils.TruncateAt.END
+            if (bold) paint.isFakeBoldText = true
+        })
+        if (meta.isNotBlank()) addView(TextView(ctx).apply { text = meta; textSize = 12f; setTextColor(Colors.MUTED) })
+        setOnClickListener { onClick() }
+    }
 
     /** 内容有变化时调用；流式输出很频繁，合并到每 80ms 刷一次。 */
     fun refresh(qa: Qa) {
@@ -120,6 +197,15 @@ class AnswerView(
     }
 
     private fun renderHeader() {
+        if (sessionsShown || current == null) {
+            chip.visibility = View.GONE
+            prevBtn.visibility = View.GONE; nextBtn.visibility = View.GONE; posText.visibility = View.GONE
+            title.text = loc.getString(if (sessionsShown) R.string.sessions else R.string.session_untitled)
+            val can = false
+            moreBtn.isEnabled = can; revealBtn.isEnabled = can; moreBtn.alpha = 0.4f; revealBtn.alpha = 0.4f
+            return
+        }
+        prevBtn.visibility = View.VISIBLE; nextBtn.visibility = View.VISIBLE; posText.visibility = View.VISIBLE
         val qa = current ?: return
         val type = qa.type.ifBlank { if (qa.busy) "…" else "" }
         chip.text = type
@@ -138,8 +224,16 @@ class AnswerView(
 
     private fun render() {
         renderHeader()
-        val qa = current ?: return
         if (!pageReady) return
+        val qa = current
+        if (qa == null) {
+            if (emptyShown) {
+                val payload = JSONObject().put("key", "empty").put("turns", JSONArray()).put("empty", loc.getString(R.string.session_empty))
+                    .put("s", JSONObject().put("loading", "").put("retry", ""))
+                web.evaluateJavascript("render(${JSONObject.quote(payload.toString())})", null)
+            }
+            return
+        }
         val turns = JSONArray()
         for (t in qa.turns) {
             turns.put(JSONObject()

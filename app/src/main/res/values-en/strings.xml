@@ -53,6 +53,12 @@
     <string name="no_camera">No camera app found</string>
     <string name="src_paste">Paste</string>
     <string name="src_capture">Screenshot</string>
+    <string name="sessions">Sessions</string>
+    <string name="session_new">+ New session</string>
+    <string name="session_current">Current</string>
+    <string name="session_untitled">New session</string>
+    <string name="session_count">%1$d questions</string>
+    <string name="session_empty">This is a new session. Circle a question to start; nothing from other sessions is carried over. Tap ☰ at the top right to switch back to another session.</string>
     <string name="capture_channel">Screen capture</string>
     <string name="capture_notice">Quanwen can take screenshots (used only on the circle page, never saved to the gallery; stops when you leave the page)</string>
     <string name="capture_denied">Screen capture was not allowed</string>

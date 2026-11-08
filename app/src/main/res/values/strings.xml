@@ -53,6 +53,12 @@
     <string name="no_camera">没有找到相机 App</string>
     <string name="src_paste">粘贴</string>
     <string name="src_capture">截屏</string>
+    <string name="sessions">会话</string>
+    <string name="session_new">＋ 新建会话</string>
+    <string name="session_current">当前</string>
+    <string name="session_untitled">新会话</string>
+    <string name="session_count">%1$d 题</string>
+    <string name="session_empty">这是一个新会话。圈一道题开始，别的会话里的问答不会带进来。点右上角 ☰ 可以切回别的会话。</string>
     <string name="capture_channel">截屏</string>
     <string name="capture_notice">圈问可以截屏（只在圈题页用，不存相册；离开圈题页就停止）</string>
     <string name="capture_denied">没有得到截屏授权</string>

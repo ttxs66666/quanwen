@@ -102,19 +102,46 @@ class QaStore(context: Context) {
 
     fun reload() { list.clear(); list.addAll(loadAll()) }
 
-    /** 新建一道题：和上一道同科目、间隔不到 90 分钟、中间没点过「开始新会话」，就算同一次学习。 */
+    // ---------- 会话：手动管理（新建、切换），不再按时间自动分 ----------
+
+    /** 当前会话的 id。第一次用时接着最后一道题所在的会话；一道题都没有就新开一个。 */
+    val currentSessionId: String
+        get() {
+            val saved = prefs.currentSessionId
+            if (saved.isNotBlank()) return saved
+            val id = list.lastOrNull()?.sessionId ?: System.currentTimeMillis().toString()
+            prefs.currentSessionId = id
+            return id
+        }
+
+    fun newSession(): String = System.currentTimeMillis().toString().also { prefs.currentSessionId = it }
+
+    fun switchSession(id: String) { prefs.currentSessionId = id }
+
+    /** 新建一道题，放进当前会话。 */
     fun create(subject: String, lang: String): Qa {
         val now = System.currentTimeMillis()
-        val last = list.lastOrNull()
-        val sameSession = last != null && last.subject == subject &&
-            now - last.time < SESSION_GAP_MS && last.time >= prefs.sessionBreakAt
-        val id = now.toString()
-        val qa = Qa(id = id, sessionId = if (sameSession) last!!.sessionId else id, subject = subject, time = now, lang = lang)
+        val qa = Qa(id = now.toString(), sessionId = currentSessionId, subject = subject, time = now, lang = lang)
         list.add(qa)
         return qa
     }
 
-    fun session(qa: Qa): List<Qa> = list.filter { it.sessionId == qa.sessionId }
+    fun session(qa: Qa): List<Qa> = sessionQas(qa.sessionId)
+    fun sessionQas(id: String): List<Qa> = list.filter { it.sessionId == id }
+
+    class Session(val id: String, val qas: List<Qa>) {
+        val lastTime: Long get() = qas.maxOfOrNull { it.time } ?: (id.toLongOrNull() ?: 0L)
+        val title: String get() = qas.firstOrNull { it.title.isNotBlank() }?.title ?: ""
+        val subject: String get() = qas.firstOrNull { it.subject.isNotBlank() }?.subject ?: ""
+    }
+
+    /** 所有会话，最近用过的在前；当前会话即使还没有题也列出来。 */
+    fun sessions(): List<Session> {
+        val groups = list.groupBy { it.sessionId }.map { (id, qas) -> Session(id, qas.sortedBy { it.time }) }.toMutableList()
+        val cur = currentSessionId
+        if (groups.none { it.id == cur }) groups.add(Session(cur, emptyList()))
+        return groups.sortedByDescending { it.lastTime }
+    }
 
     /** 本次学习里在这道题之前的问答，作为文字上下文发给模型。 */
     fun historyText(qa: Qa): String {
@@ -143,7 +170,6 @@ class QaStore(context: Context) {
     }
 
     companion object {
-        const val SESSION_GAP_MS = 90 * 60 * 1000L
 
         /** 从第一轮的原始输出里拆出类型、题目和正文。还没收到分隔线时正文为 null。 */
         fun parseFirst(raw: String, finished: Boolean): Triple<String, String, String?> {

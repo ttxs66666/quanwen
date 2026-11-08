@@ -100,10 +100,11 @@ class QuanwenService : AccessibilityService() {
     fun onCardTap() {
         val c = card ?: return
         if (c.visible) { c.hide(); return }
-        val qa = c.current ?: Engine.store.list.lastOrNull()
-        if (qa == null) { toast(str(R.string.no_answer_yet)); return }
-        c.show(qa, place = c.current == null)
         bar?.setDot(false)
+        if (c.hasContent) { c.reshow(); return }
+        // 第一次打开：显示当前会话的最后一题；当前会话还没有题就显示空白状态（可以点 ☰ 切换会话）
+        val qa = Engine.store.sessionQas(Engine.store.currentSessionId).lastOrNull()
+        if (qa != null) c.show(qa, place = true) else c.showEmpty()
     }
 
     // ---------- 截屏和圈选 ----------

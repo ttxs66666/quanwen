@@ -27,6 +27,7 @@
   .error { color: #b3261e; font-family: sans-serif; font-size: 13px; }
   .retry { display: inline-block; margin-top: 6px; color: #d2412f; font-weight: bold; text-decoration: none; }
   .crop { display: block; max-width: 100%; border-radius: 8px; border: 1px solid rgba(0,0,0,.1); margin: 4px 0 10px; }
+  .empty { color: #8a8778; font-family: sans-serif; font-size: 14px; padding: 6px 0 10px; }
   .meta { font-family: sans-serif; font-size: 12px; color: #8a8778; margin-bottom: 6px; }
 </style>
 </head>
@@ -82,6 +83,7 @@ var lastKey = null, lastCount = 0;
 // payload: {key, turns:[{label,text,state,error}], s:{loading,retry}, image?, meta?}
 function render(json) {
   var p = JSON.parse(json), html = '';
+  if (p.empty) html += '<div class="empty">' + esc(p.empty) + '</div>';
   if (p.meta) html += '<div class="meta">' + esc(p.meta) + '</div>';
   if (p.image) html += '<img class="crop" src="' + p.image + '">';
   p.turns.forEach(function (t, i) {

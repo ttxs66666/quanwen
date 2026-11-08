@@ -106,6 +106,15 @@ class CircleActivity : Activity() {
             text = getString(R.string.circle_hint); maxLines = 2
         }
         bar.addView(hint, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        // 右上角 ☰：新建会话、切换会话
+        bar.addView(TextView(this).apply {
+            text = "☰"; textSize = 22f; setTextColor(Colors.INK); gravity = Gravity.CENTER
+            setPadding(dpi(14f), dpi(4f), dpi(10f), dpi(4f))
+            setOnClickListener {
+                answer.visibility = View.VISIBLE; arrange()
+                answer.showSessions()
+            }
+        })
         root.addView(bar)
 
         content = LinearLayout(this)

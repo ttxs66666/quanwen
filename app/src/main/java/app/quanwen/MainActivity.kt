@@ -165,7 +165,8 @@ class MainActivity : Activity() {
         subject = field(getString(R.string.subject), prefs.subject, getString(R.string.subject_hint))
         col.addView(row(
             button(getString(R.string.new_session)) {
-                prefs.sessionBreakAt = System.currentTimeMillis()
+                Engine.init(this)
+                Engine.store.newSession()
                 Toast.makeText(this, R.string.new_session_done, Toast.LENGTH_SHORT).show()
             },
             button(getString(R.string.history)) { startActivity(Intent(this, HistoryActivity::class.java)) },

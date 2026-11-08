@@ -34,7 +34,8 @@ class AnswerCard(private val svc: QuanwenService) {
     /** 显示某道题。place=true 时把卡片挪到圈的旁边。 */
     fun show(qa: Qa, place: Boolean) {
         params.width = cardW
-        if (place) placeNear(qa.bounds)
+        // App 内圈的题没有屏幕上的位置（全是 0），就放在悬浮条左边
+        if (place) { if (qa.bounds.all { it == 0f }) placeDefault() else placeNear(qa.bounds) }
         if (!attached) { svc.wm.addView(view, params); attached = true } else svc.wm.updateViewLayout(view, params)
         view.visibility = View.VISIBLE
         visible = true
@@ -42,6 +43,22 @@ class AnswerCard(private val svc: QuanwenService) {
     }
 
     fun hide() { view.visibility = View.GONE; visible = false }
+
+    /** 已经显示过内容（某道题，或新会话的空白状态）。 */
+    val hasContent: Boolean get() = attached && (view.current != null || view.emptyShown)
+
+    /** 原样再拿出来，不换内容。 */
+    fun reshow() { if (attached) { view.visibility = View.VISIBLE; visible = true } }
+
+    /** 当前会话还没有题：显示空白状态（可以点 ☰ 切换会话）。放在悬浮条左边。 */
+    fun showEmpty() {
+        params.width = cardW
+        placeDefault()
+        if (!attached) { svc.wm.addView(view, params); attached = true } else svc.wm.updateViewLayout(view, params)
+        view.visibility = View.VISIBLE
+        visible = true
+        view.showEmpty()
+    }
 
     fun hideForCapture() { visibleBeforeCapture = visible; if (attached) view.visibility = View.GONE }
     fun restoreAfterCapture() { if (visibleBeforeCapture && attached) { view.visibility = View.VISIBLE; visible = true } }
@@ -52,6 +69,14 @@ class AnswerCard(private val svc: QuanwenService) {
         if (attached) try { svc.wm.removeView(view) } catch (_: Exception) { }
         attached = false; visible = false
         view.destroy()
+    }
+
+    /** 默认位置：悬浮条左边、屏幕偏上。 */
+    private fun placeDefault() {
+        val s = screen
+        val barLeft = svc.barRect()?.left ?: s.x
+        params.x = max(svc.dpi(16f), min(barLeft - cardW - svc.dpi(16f), s.x - cardW - svc.dpi(16f)))
+        params.y = (s.y * 0.2f).toInt()
     }
 
     /** 先放圈的右边，再左边，都放不下就放圈的下方或上方；不盖住悬浮条。 */
