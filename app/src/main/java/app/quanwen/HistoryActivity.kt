@@ -124,6 +124,7 @@ class DetailActivity : Activity() {
                         .put("label", when (t.kind) {
                             Turn.KIND_MORE -> getString(R.string.label_more)
                             Turn.KIND_REVEAL -> getString(R.string.label_reveal)
+                            Turn.KIND_ASK -> getString(R.string.label_ask) + t.question
                             else -> ""
                         })
                         .put("text", t.text)

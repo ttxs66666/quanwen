@@ -7,14 +7,15 @@ import java.io.File
 
 /** 一道圈出的题里的一轮回答：第一次回答、再提示、揭晓。 */
 class Turn(
-    val kind: String,                 // KIND_FIRST / KIND_MORE / KIND_REVEAL
+    val kind: String,                 // KIND_FIRST / KIND_MORE / KIND_REVEAL / KIND_ASK
+    val question: String = "",        // KIND_ASK：用户语音追问的内容（转写后的文字）
     var text: String = "",            // 显示给用户的回答正文
     var raw: String = "",             // 模型原始输出（第一轮含类型和题目行）
     var responseId: String? = null,
     var state: Int = STATE_LOADING,
     var error: String? = null,
 ) {
-    fun toJson() = JSONObject().put("kind", kind).put("text", text).put("raw", raw)
+    fun toJson() = JSONObject().put("kind", kind).put("question", question).put("text", text).put("raw", raw)
         .put("responseId", responseId ?: "").put("state", if (state == STATE_DONE) STATE_DONE else STATE_ERROR)
         .put("error", error ?: "")
 
@@ -22,6 +23,7 @@ class Turn(
         const val KIND_FIRST = "first"
         const val KIND_MORE = "more"
         const val KIND_REVEAL = "reveal"
+        const val KIND_ASK = "ask"
         const val STATE_LOADING = 0
         const val STATE_STREAMING = 1
         const val STATE_DONE = 2
@@ -29,6 +31,7 @@ class Turn(
 
         fun fromJson(o: JSONObject) = Turn(
             kind = o.optString("kind", KIND_FIRST),
+            question = o.optString("question"),
             text = o.optString("text"),
             raw = o.optString("raw"),
             responseId = o.optString("responseId").ifBlank { null },

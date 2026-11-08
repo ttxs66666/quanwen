@@ -26,6 +26,16 @@ object Prompts {
     fun more(lang: String) = if (lang == "en") MORE_EN else MORE_ZH
     fun reveal(lang: String) = if (lang == "en") REVEAL_EN else REVEAL_ZH
 
+    /** 语音追问：直接回答他问的，仍然守分寸。 */
+    fun ask(lang: String, question: String) = if (lang == "en")
+        "They asked by voice: \"$question\". Answer that question directly. Keep the restraint: answer only what they asked, do not volunteer later steps or the final result unless that is what they are asking for. At most four sentences. The text is a speech transcription and may contain recognition errors; interpret it in the context of this problem."
+    else
+        "他用语音追问：「$question」。直接回答这个追问。仍然守分寸：只回答他问的，不要顺带说出后面的步骤或最终结果，除非他问的就是这个。最多四句。这段话是语音转写的，可能有错字，请结合这道题的语境理解。"
+
+    /** 给语音转写的提示，帮它认出专业词。 */
+    fun transcribeHint(subject: String, title: String) =
+        listOf(subject, title).filter { it.isNotBlank() }.joinToString("。")
+
     private val SYSTEM_ZH = """
 你是一个学习伴侣。用户在平板上手写学习，遇到问题就用笔把它圈出来。你的价值在于"适度"：只给他此刻需要的那一点，让他自己接着想。
 

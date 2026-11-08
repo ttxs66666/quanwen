@@ -65,13 +65,17 @@ object Engine {
     }
 
     /** 再提示一点 / 揭晓：接在上一轮回答后面（previous_response_id），图片不用重发。 */
-    fun followUp(qa: Qa, kind: String) {
+    fun followUp(qa: Qa, kind: String, question: String = "") {
         if (qa.busy) return
         val prev = qa.lastResponseId ?: return
-        val turn = Turn(kind)
+        val turn = Turn(kind, question = question)
         qa.turns.add(turn)
         notify(qa, false)
-        val text = if (kind == Turn.KIND_MORE) Prompts.more(qa.lang) else Prompts.reveal(qa.lang)
+        val text = when (kind) {
+            Turn.KIND_MORE -> Prompts.more(qa.lang)
+            Turn.KIND_ASK -> Prompts.ask(qa.lang, question)
+            else -> Prompts.reveal(qa.lang)
+        }
         val body = baseBody(qa.lang)
             .put("previous_response_id", prev)
             .put("input", JSONArray().put(JSONObject().put("role", "user")
@@ -93,7 +97,7 @@ object Engine {
             }
         } else {
             qa.turns.removeAt(index)
-            followUp(qa, turn.kind)
+            followUp(qa, turn.kind, turn.question)
         }
     }
 

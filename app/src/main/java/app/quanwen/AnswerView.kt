@@ -64,7 +64,11 @@ class AnswerView(
     var emptyShown = false
         private set
     private val moreBtn = footerBtn()
+    private val voiceBtn = footerBtn()
     private val revealBtn = footerBtn()
+    /** 语音追问的状态：0 空闲，1 录音中，2 识别中。 */
+    private var voiceState = 0
+    private val autoStop = Runnable { if (voiceState == 1) stopVoice() }
 
     private var pageReady = false
     private var renderQueued = false
@@ -96,7 +100,9 @@ class AnswerView(
         footer.orientation = HORIZONTAL
         footer.setPadding(ctx.dpi(10f), ctx.dpi(4f), ctx.dpi(10f), ctx.dpi(10f))
         footer.addView(moreBtn, LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = ctx.dpi(8f) })
+        footer.addView(voiceBtn, LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = ctx.dpi(8f) })
         footer.addView(revealBtn, LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        voiceBtn.setOnClickListener { onVoiceClick() }
         moreBtn.setOnClickListener { current?.let { Engine.followUp(it, Turn.KIND_MORE) } }
         revealBtn.setOnClickListener { current?.let { Engine.followUp(it, Turn.KIND_REVEAL) } }
         addView(footer)
@@ -108,6 +114,7 @@ class AnswerView(
         loc = Lang.wrap(ctx)
         moreBtn.text = loc.getString(R.string.btn_more)
         revealBtn.text = loc.getString(R.string.btn_reveal)
+        paintVoice()
         renderHeader()
     }
 
@@ -121,6 +128,62 @@ class AnswerView(
         if (sessionsShown) hideSessions()
         current = null; emptyShown = true; render()
     }
+
+    // ---------- 语音追问 ----------
+
+    private fun onVoiceClick() {
+        when (voiceState) {
+            1 -> stopVoice()
+            2 -> Unit
+            else -> {
+                val qa = current ?: return
+                if (qa.busy || qa.lastResponseId == null) return
+                if (!VoiceRecorder.hasPermission(ctx)) { MicPermissionActivity.open(ctx); return }
+                if (!VoiceRecorder.start(ctx)) { toast(R.string.mic_failed); return }
+                voiceState = 1; paintVoice()
+                postDelayed(autoStop, VoiceRecorder.MAX_MS)
+            }
+        }
+    }
+
+    private fun stopVoice() {
+        removeCallbacks(autoStop)
+        val qa = current
+        val (result, audio) = VoiceRecorder.stop()
+        if (result != VoiceRecorder.Result.OK || audio == null || qa == null) {
+            voiceState = 0; paintVoice()
+            toast(when (result) {
+                VoiceRecorder.Result.TOO_SHORT -> R.string.voice_too_short
+                VoiceRecorder.Result.SILENT -> R.string.voice_unclear
+                else -> R.string.mic_failed
+            })
+            return
+        }
+        voiceState = 2; paintVoice()
+        val prefs = Prefs(ctx)
+        // 提示里只放科目：放题目的话，录音太轻时模型会把题目原样「认」出来
+        val hint = Prompts.transcribeHint(qa.subject, "")
+        Thread {
+            val text = try { VoiceRecorder.transcribe(prefs.baseUrl, prefs.apiKey, audio, hint) } catch (e: Exception) { null }
+            post {
+                voiceState = 0; paintVoice()
+                when {
+                    text == null -> toast(R.string.voice_failed)
+                    text.isBlank() -> toast(R.string.voice_unclear)
+                    else -> Engine.followUp(qa, Turn.KIND_ASK, text)
+                }
+            }
+        }.start()
+    }
+
+    private fun paintVoice() {
+        voiceBtn.text = loc.getString(when (voiceState) { 1 -> R.string.voice_stop; 2 -> R.string.voice_working; else -> R.string.btn_voice })
+        voiceBtn.setTextColor(if (voiceState == 1) Color.WHITE else Colors.INK)
+        voiceBtn.background = if (voiceState == 1) rounded(Colors.ACCENT, ctx.dp(10f))
+                              else rounded(0x0F000000, ctx.dp(10f), 0x22000000, ctx.dpi(1f))
+    }
+
+    private fun toast(id: Int) = android.widget.Toast.makeText(ctx, loc.getString(id), android.widget.Toast.LENGTH_SHORT).show()
 
     // ---------- 会话列表 ----------
 
@@ -203,6 +266,7 @@ class AnswerView(
             title.text = loc.getString(if (sessionsShown) R.string.sessions else R.string.session_untitled)
             val can = false
             moreBtn.isEnabled = can; revealBtn.isEnabled = can; moreBtn.alpha = 0.4f; revealBtn.alpha = 0.4f
+            voiceBtn.isEnabled = can; voiceBtn.alpha = 0.4f
             return
         }
         prevBtn.visibility = View.VISIBLE; nextBtn.visibility = View.VISIBLE; posText.visibility = View.VISIBLE
@@ -220,6 +284,8 @@ class AnswerView(
         val canFollow = !qa.busy && qa.lastResponseId != null
         moreBtn.isEnabled = canFollow; revealBtn.isEnabled = canFollow
         moreBtn.alpha = if (canFollow) 1f else 0.4f; revealBtn.alpha = moreBtn.alpha
+        voiceBtn.isEnabled = canFollow || voiceState != 0
+        voiceBtn.alpha = if (voiceBtn.isEnabled) 1f else 0.4f
     }
 
     private fun render() {
@@ -240,6 +306,7 @@ class AnswerView(
                 .put("label", when (t.kind) {
                     Turn.KIND_MORE -> loc.getString(R.string.label_more)
                     Turn.KIND_REVEAL -> loc.getString(R.string.label_reveal)
+                    Turn.KIND_ASK -> loc.getString(R.string.label_ask) + t.question
                     else -> ""
                 })
                 .put("text", t.text)

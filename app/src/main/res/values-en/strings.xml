@@ -12,6 +12,16 @@
     <string name="btn_reveal">Reveal</string>
     <string name="label_more">More</string>
     <string name="label_reveal">Reveal</string>
+    <string name="label_ask">You asked: </string>
+    <string name="btn_voice">🎤 Ask</string>
+    <string name="voice_stop">● Tap when done</string>
+    <string name="voice_working">Transcribing…</string>
+    <string name="voice_too_short">Too short: tap once to start talking, tap again when you\'re done.</string>
+    <string name="voice_failed">Speech recognition failed; check the network and try again.</string>
+    <string name="voice_unclear">Didn\'t catch that, please say it again.</string>
+    <string name="mic_failed">Couldn\'t open the microphone</string>
+    <string name="mic_granted">Microphone allowed. Go back to the answer card (tap the card button on the float bar) and tap 🎤 Ask to start talking.</string>
+    <string name="mic_needed">Microphone access is needed to ask by voice.</string>
     <string name="thinking">Thinking</string>
     <string name="reading">Reading what you circled</string>
     <string name="retry">Retry</string>
