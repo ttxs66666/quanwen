@@ -27,7 +27,7 @@
 - 回答卡片可以拖动，能显示 LaTeX 公式，能翻看这次学习里的其他回答。
 - 同一次学习里前面问过的内容会一并交给 AI，它会接着往下讲。
 - **App 内圈题**：不用悬浮条，开不了无障碍的系统（比如鸿蒙的卓易通）也能用。
-  - 分屏，一半笔记、一半圈问。用系统截屏后，圈问会自动载入这张最新截图，在圈问里直接圈题。
+  - 分屏，一半笔记、一半圈问。点圈题页的「截屏」，圈问会截下笔记那一半（自动去掉圈问自己那半屏），截图只临时用，不存相册。也可以用系统截屏，圈问会自动载入最新截图。
   - 也可以把截图（或别的 App 里的图片）直接拖进圈问；还可以从相册选图、粘贴，或者拍一张纸质笔记来圈。
   - 双指可以缩放。长按桌面图标有「圈最新截图」「拍照圈题」两个快捷方式。
 - 有历史记录，界面中英双语，应用内可以检查更新。
@@ -87,7 +87,7 @@ The point: you ask the questions and do the reasoning; the AI only nudges you wh
 - The answer card is draggable, renders LaTeX, and lets you page through the other answers from the session.
 - Earlier questions from the same session are passed to the AI, so it can build on them.
 - **Circle in the app**: no float bar needed, so it also works where accessibility can't be turned on (for example HarmonyOS with Zhuoyitong).
-  - Split the screen with notes on one half and Quanwen on the other. Take a system screenshot and Quanwen loads it automatically, then circle right there.
+  - Split the screen with notes on one half and Quanwen on the other. Tap Screenshot on the circle page and Quanwen captures the notes half (cropping out its own half); the capture is temporary and never saved to the gallery. A system screenshot also works: Quanwen loads the latest one automatically.
   - You can also drag a screenshot (or an image from another app) straight into Quanwen, pick one from the gallery, paste one, or photograph paper notes.
   - Pinch to zoom. Long-press the launcher icon for the "Circle latest screenshot" and "Circle a photo" shortcuts.
 - History, a Chinese/English interface, and in-app updates.

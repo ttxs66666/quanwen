@@ -15,6 +15,9 @@ import android.database.ContentObserver
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
+import android.graphics.Rect
+import android.media.projection.MediaProjectionConfig
+import android.media.projection.MediaProjectionManager
 import android.media.ExifInterface
 import android.net.Uri
 import android.os.Build
@@ -36,7 +39,8 @@ import kotlin.math.max
 
 /**
  * App 内圈题：不用悬浮条和无障碍（比如鸿蒙卓易通里开不了无障碍）。
- * 图片来源：最新截图、相册、拍照。分屏时一半笔记一半圈问，用系统截屏后这里会自动载入新截图。
+ * 图片来源：最新截图、截屏、相册、粘贴、拖进来、拍照（拍照入口在设置页和桌面快捷方式）。
+ * 分屏时一半笔记一半圈问，用系统截屏后这里会自动载入新截图；也可以直接点「截屏」。
  */
 class CircleActivity : Activity() {
     private lateinit var lasso: ImageLassoView
@@ -71,6 +75,7 @@ class CircleActivity : Activity() {
     }
 
     override fun onDestroy() {
+        if (ScreenGrabber.active) stopService(Intent(this, CaptureService::class.java))
         Engine.removeListener(onQaChanged)
         observer?.let { contentResolver.unregisterContentObserver(it) }
         answer.destroy()
@@ -94,7 +99,7 @@ class CircleActivity : Activity() {
         }
         bar.addView(button(getString(R.string.src_latest)) { latest(userAsked = true) })
         bar.addView(button(getString(R.string.src_pick)) { pick() })
-        bar.addView(button(getString(R.string.src_camera)) { camera() })
+        bar.addView(button(getString(R.string.src_capture)) { captureScreen() })
         bar.addView(button(getString(R.string.src_paste)) { paste() })
         hint = TextView(this).apply {
             textSize = 13f; setTextColor(Colors.MUTED); setPadding(dpi(12f), 0, 0, 0)
@@ -191,6 +196,44 @@ class CircleActivity : Activity() {
         file.parentFile?.mkdirs()
     }
 
+    // ---------- 截屏（录屏接口，不需要无障碍） ----------
+
+    /** 第一次点：系统弹一次录屏授权；之后这个页面开着，每点一次截一张。 */
+    private fun captureScreen() {
+        followLatest = false
+        if (ScreenGrabber.active) { grabNow(); return }
+        val mpm = getSystemService(MediaProjectionManager::class.java)
+        val i = if (Build.VERSION.SDK_INT >= 34) mpm.createScreenCaptureIntent(MediaProjectionConfig.createConfigForDefaultDisplay())
+                else mpm.createScreenCaptureIntent()
+        try { startActivityForResult(i, REQ_CAPTURE) } catch (e: Exception) { toast(getString(R.string.capture_failed)) }
+    }
+
+    private fun grabNow() {
+        ScreenGrabber.grab { b ->
+            if (b == null) { toast(getString(R.string.capture_failed)); return@grab }
+            loadedImageId = -1L
+            show(cropOutSelf(b))
+        }
+    }
+
+    /** 分屏时把圈问自己这半屏裁掉，只留笔记那一半；全屏时不裁。 */
+    private fun cropOutSelf(b: Bitmap): Bitmap {
+        val dv = window.decorView
+        val loc = IntArray(2); dv.getLocationOnScreen(loc)
+        val sx = b.width; val sy = b.height
+        val r = Rect(loc[0], loc[1], loc[0] + dv.width, loc[1] + dv.height)
+        val keep: Rect? = when {
+            r.width() >= sx * 0.85f && r.height() >= sy * 0.85f -> null
+            r.left >= sx * 0.25f -> Rect(0, 0, r.left, sy)
+            r.right <= sx * 0.75f -> Rect(r.right, 0, sx, sy)
+            r.top >= sy * 0.25f -> Rect(0, 0, sx, r.top)
+            r.bottom <= sy * 0.75f -> Rect(0, r.bottom, sx, sy)
+            else -> null
+        }
+        if (keep == null || keep.width() < 64 || keep.height() < 64) return b
+        return Bitmap.createBitmap(b, keep.left, keep.top, keep.width(), keep.height())
+    }
+
     // ---------- 拖进来、粘贴 ----------
 
     /**
@@ -240,6 +283,13 @@ class CircleActivity : Activity() {
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQ_CAPTURE) {
+            if (resultCode != RESULT_OK || data == null) { toast(getString(R.string.capture_denied)); return }
+            ScreenGrabber.onReady = { main.postDelayed({ grabNow() }, 600) }   // 等第一帧画面进来
+            startForegroundService(Intent(this, CaptureService::class.java)
+                .putExtra(CaptureService.EXTRA_CODE, resultCode).putExtra(CaptureService.EXTRA_DATA, data))
+            return
+        }
         if (resultCode != RESULT_OK) return
         when (requestCode) {
             REQ_PICK -> data?.data?.let { loadInto(it, -1L, announce = false) }
@@ -358,6 +408,7 @@ class CircleActivity : Activity() {
         private const val REQ_PICK = 1
         private const val REQ_CAMERA = 2
         private const val REQ_PERMISSION = 3
+        private const val REQ_CAPTURE = 4
 
         fun open(context: Context, source: String) =
             context.startActivity(Intent(context, CircleActivity::class.java).putExtra(EXTRA_SOURCE, source))
