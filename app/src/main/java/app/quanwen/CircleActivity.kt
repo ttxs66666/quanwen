@@ -74,6 +74,12 @@ class CircleActivity : Activity() {
         }
     }
 
+    /** 圈问离开屏幕（切后台、被别的 App 盖住）就停止录屏；回来再截时重新授权一次。 */
+    override fun onStop() {
+        super.onStop()
+        if (ScreenGrabber.active && !isChangingConfigurations) stopService(Intent(this, CaptureService::class.java))
+    }
+
     override fun onDestroy() {
         if (ScreenGrabber.active) stopService(Intent(this, CaptureService::class.java))
         Engine.removeListener(onQaChanged)
@@ -240,7 +246,7 @@ class CircleActivity : Activity() {
             else -> null
         }
         if (keep == null || keep.width() < 64 || keep.height() < 64) return b
-        return Bitmap.createBitmap(b, keep.left, keep.top, keep.width(), keep.height())
+        return Bitmap.createBitmap(b, keep.left, keep.top, keep.width(), keep.height()).also { if (it !== b) b.recycle() }
     }
 
     // ---------- 拖进来、粘贴 ----------

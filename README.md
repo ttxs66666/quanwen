@@ -17,7 +17,7 @@
 | 写到一半的推导 | 只给下一步的方向，不给结果 |
 | 点「再提示一点」 | 在上一次的基础上多推一步 |
 | 点「揭晓」 | 先一句话讲背后的思想，再给简明推导 |
-| 点「🎤 追问」说一句话 | 直接回答你问的那一点，仍然不顺带说出后面的步骤 |
+| 点「追问」，再选书写板 / 语音 / 打字 | 直接回答你问的那一点，仍然不顺带说出后面的步骤 |
 
 它想做的是：让你自己提问、自己推，AI 只在你卡住的地方推一把。
 
@@ -25,7 +25,10 @@
 
 - **悬浮条**有两个按钮：「圈」用来截图圈题；「卡」用来显示或隐藏回答卡片，关掉的卡片随时能再打开。
 - 截图时悬浮条和卡片都会先隐藏，不会被截进去。
-- **语音追问**：回答卡片中间的「🎤 追问」，点一下开始说、说完再点一下，语音用 OpenAI 转成文字后接着追问；几乎没声音时不会发出去。
+- **追问**：回答卡片中间的「追问」，点开有三种方式。
+  - ✍ 书写板：用笔把问题写下来，AI 直接看字迹，回答前先复述它认出的内容。
+  - 🎤 语音：说完点一下，用 OpenAI 转成文字；几乎没声音时不会发出去。
+  - ⌨ 打字：在输入框里打字。
 - 回答卡片可以拖动，能显示 LaTeX 公式，能翻看这次学习里的其他回答。
 - **会话**：回答面板右上角的 ☰ 可以新建会话、切换会话。新圈的题只进当前会话，AI 也只参考当前会话里前面的问答，复习一门、再学另一门，互不干扰。
 - **App 内圈题**：不用悬浮条，开不了无障碍的系统（比如鸿蒙的卓易通）也能用。
@@ -79,7 +82,7 @@ Quanwen is a handwriting study companion for Android tablets. Write in any note-
 | A derivation that stops halfway | Only the direction of the next step, not its result |
 | Tap "A bit more" | One step further than the last hint |
 | Tap "Reveal" | The idea behind the step in one sentence, then a concise derivation |
-| Tap "🎤 Ask" and say something | A direct answer to exactly what you asked, still without volunteering later steps |
+| Tap "Ask", then write, speak or type | A direct answer to exactly what you asked, still without volunteering later steps |
 
 The point: you ask the questions and do the reasoning; the AI only nudges you where you are stuck.
 
@@ -87,7 +90,10 @@ The point: you ask the questions and do the reasoning; the AI only nudges you wh
 
 - **Floating bar** with two buttons: "circle" captures the screen so you can circle a question; "card" shows or hides the answer card, so a closed card can be reopened any time.
 - The bar and card hide themselves before the screenshot, so they never appear in it.
-- **Ask by voice**: tap "🎤 Ask" in the middle of the answer card, talk, and tap again when done; the speech is transcribed by OpenAI and sent as a follow-up. Near-silent recordings are not sent.
+- **Ask a follow-up**: tap "Ask" in the middle of the answer card and pick one of three ways.
+  - ✍ Write: write the question on a pad; the AI reads your handwriting and first repeats what it read.
+  - 🎤 Voice: talk, then tap when done; transcribed by OpenAI, and near-silent recordings are not sent.
+  - ⌨ Type: type it in a text box.
 - The answer card is draggable, renders LaTeX, and lets you page through the other answers from the session.
 - **Sessions**: the ☰ button at the top right of the answer panel creates or switches sessions. New questions go into the current session, and the AI only builds on earlier questions from that session, so reviewing one subject and then studying another don't mix.
 - **Circle in the app**: no float bar needed, so it also works where accessibility can't be turned on (for example HarmonyOS with Zhuoyitong).

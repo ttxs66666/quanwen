@@ -30,6 +30,8 @@ class AnswerView(
     private val maxBodyHeight: () -> Int,
     private val onClose: () -> Unit,
     private val onResized: () -> Unit = {},
+    /** 打字追问需要键盘：悬浮卡片要临时变成能获得焦点的窗口。 */
+    private val onNeedFocus: (Boolean) -> Unit = {},
 ) : LinearLayout(ctx) {
 
     var current: Qa? = null
@@ -64,11 +66,13 @@ class AnswerView(
     var emptyShown = false
         private set
     private val moreBtn = footerBtn()
-    private val voiceBtn = footerBtn()
+    private val askBtn = footerBtn()
     private val revealBtn = footerBtn()
-    /** 语音追问的状态：0 空闲，1 录音中，2 识别中。 */
-    private var voiceState = 0
-    private val autoStop = Runnable { if (voiceState == 1) stopVoice() }
+    /** 追问输入区（书写板 / 语音 / 打字），点「追问」时盖住底部按钮。 */
+    private val askInput = AskInputView(ctx, currentQa = { current },
+        onClosed = { closeAsk() }, onNeedFocus = { onNeedFocus(it) }, onResized = { onResized() })
+    /** 手写追问的字迹图，按文件路径缓存成 data URL。 */
+    private val imageCache = HashMap<String, String>()
 
     private var pageReady = false
     private var renderQueued = false
@@ -100,12 +104,14 @@ class AnswerView(
         footer.orientation = HORIZONTAL
         footer.setPadding(ctx.dpi(10f), ctx.dpi(4f), ctx.dpi(10f), ctx.dpi(10f))
         footer.addView(moreBtn, LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = ctx.dpi(8f) })
-        footer.addView(voiceBtn, LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = ctx.dpi(8f) })
+        footer.addView(askBtn, LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = ctx.dpi(8f) })
         footer.addView(revealBtn, LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        voiceBtn.setOnClickListener { onVoiceClick() }
+        askBtn.setOnClickListener { openAsk() }
         moreBtn.setOnClickListener { current?.let { Engine.followUp(it, Turn.KIND_MORE) } }
         revealBtn.setOnClickListener { current?.let { Engine.followUp(it, Turn.KIND_REVEAL) } }
         addView(footer)
+        askInput.visibility = View.GONE
+        addView(askInput)
         applyStrings()
     }
 
@@ -114,7 +120,8 @@ class AnswerView(
         loc = Lang.wrap(ctx)
         moreBtn.text = loc.getString(R.string.btn_more)
         revealBtn.text = loc.getString(R.string.btn_reveal)
-        paintVoice()
+        askBtn.text = loc.getString(R.string.btn_ask)
+        askInput.applyStrings()
         renderHeader()
     }
 
@@ -129,61 +136,22 @@ class AnswerView(
         current = null; emptyShown = true; render()
     }
 
-    // ---------- 语音追问 ----------
+    // ---------- 追问 ----------
 
-    private fun onVoiceClick() {
-        when (voiceState) {
-            1 -> stopVoice()
-            2 -> Unit
-            else -> {
-                val qa = current ?: return
-                if (qa.busy || qa.lastResponseId == null) return
-                if (!VoiceRecorder.hasPermission(ctx)) { MicPermissionActivity.open(ctx); return }
-                if (!VoiceRecorder.start(ctx)) { toast(R.string.mic_failed); return }
-                voiceState = 1; paintVoice()
-                postDelayed(autoStop, VoiceRecorder.MAX_MS)
-            }
-        }
+    private fun openAsk() {
+        val qa = current ?: return
+        if (qa.busy || qa.lastResponseId == null) return
+        footer.visibility = View.GONE
+        askInput.visibility = View.VISIBLE
+        askInput.open()
+        onResized()
     }
 
-    private fun stopVoice() {
-        removeCallbacks(autoStop)
-        val qa = current
-        val (result, audio) = VoiceRecorder.stop()
-        if (result != VoiceRecorder.Result.OK || audio == null || qa == null) {
-            voiceState = 0; paintVoice()
-            toast(when (result) {
-                VoiceRecorder.Result.TOO_SHORT -> R.string.voice_too_short
-                VoiceRecorder.Result.SILENT -> R.string.voice_unclear
-                else -> R.string.mic_failed
-            })
-            return
-        }
-        voiceState = 2; paintVoice()
-        val prefs = Prefs(ctx)
-        // 提示里只放科目：放题目的话，录音太轻时模型会把题目原样「认」出来
-        val hint = Prompts.transcribeHint(qa.subject, "")
-        Thread {
-            val text = try { VoiceRecorder.transcribe(prefs.baseUrl, prefs.apiKey, audio, hint) } catch (e: Exception) { null }
-            post {
-                voiceState = 0; paintVoice()
-                when {
-                    text == null -> toast(R.string.voice_failed)
-                    text.isBlank() -> toast(R.string.voice_unclear)
-                    else -> Engine.followUp(qa, Turn.KIND_ASK, text)
-                }
-            }
-        }.start()
+    private fun closeAsk() {
+        askInput.visibility = View.GONE
+        if (!sessionsShown) footer.visibility = View.VISIBLE
+        onResized()
     }
-
-    private fun paintVoice() {
-        voiceBtn.text = loc.getString(when (voiceState) { 1 -> R.string.voice_stop; 2 -> R.string.voice_working; else -> R.string.btn_voice })
-        voiceBtn.setTextColor(if (voiceState == 1) Color.WHITE else Colors.INK)
-        voiceBtn.background = if (voiceState == 1) rounded(Colors.ACCENT, ctx.dp(10f))
-                              else rounded(0x0F000000, ctx.dp(10f), 0x22000000, ctx.dpi(1f))
-    }
-
-    private fun toast(id: Int) = android.widget.Toast.makeText(ctx, loc.getString(id), android.widget.Toast.LENGTH_SHORT).show()
 
     // ---------- 会话列表 ----------
 
@@ -210,7 +178,7 @@ class AnswerView(
                 if (last != null) showQa(last) else showEmpty()
             })
         }
-        web.visibility = View.GONE; footer.visibility = View.GONE
+        web.visibility = View.GONE; footer.visibility = View.GONE; askInput.visibility = View.GONE
         if (!fill) {
             val lp = sessionScroll.layoutParams
             lp.height = minOf(maxBodyHeight(), ctx.dpi(58f) * sessionList.childCount + ctx.dpi(16f))
@@ -252,6 +220,9 @@ class AnswerView(
 
     fun destroy() = web.destroy()
 
+    /** 让网页重新报一次高度（最大高度规则变了的时候用）。 */
+    fun remeasure() { if (pageReady) web.evaluateJavascript("reportHeight()", null) }
+
     private fun step(delta: Int) {
         val qa = current ?: return
         val list = Engine.store.session(qa)
@@ -266,7 +237,7 @@ class AnswerView(
             title.text = loc.getString(if (sessionsShown) R.string.sessions else R.string.session_untitled)
             val can = false
             moreBtn.isEnabled = can; revealBtn.isEnabled = can; moreBtn.alpha = 0.4f; revealBtn.alpha = 0.4f
-            voiceBtn.isEnabled = can; voiceBtn.alpha = 0.4f
+            askBtn.isEnabled = can; askBtn.alpha = 0.4f
             return
         }
         prevBtn.visibility = View.VISIBLE; nextBtn.visibility = View.VISIBLE; posText.visibility = View.VISIBLE
@@ -284,8 +255,7 @@ class AnswerView(
         val canFollow = !qa.busy && qa.lastResponseId != null
         moreBtn.isEnabled = canFollow; revealBtn.isEnabled = canFollow
         moreBtn.alpha = if (canFollow) 1f else 0.4f; revealBtn.alpha = moreBtn.alpha
-        voiceBtn.isEnabled = canFollow || voiceState != 0
-        voiceBtn.alpha = if (voiceBtn.isEnabled) 1f else 0.4f
+        askBtn.isEnabled = canFollow; askBtn.alpha = moreBtn.alpha
     }
 
     private fun render() {
@@ -306,9 +276,11 @@ class AnswerView(
                 .put("label", when (t.kind) {
                     Turn.KIND_MORE -> loc.getString(R.string.label_more)
                     Turn.KIND_REVEAL -> loc.getString(R.string.label_reveal)
-                    Turn.KIND_ASK -> loc.getString(R.string.label_ask) + t.question
+                    Turn.KIND_ASK -> if (t.imagePath.isNotBlank() && t.question.isBlank()) loc.getString(R.string.label_ask_hand)
+                                     else loc.getString(R.string.label_ask) + t.question
                     else -> ""
                 })
+                .put("image", if (t.imagePath.isNotBlank()) imageUrl(t.imagePath) else "")
                 .put("text", t.text)
                 .put("state", when (t.state) {
                     Turn.STATE_LOADING -> "loading"; Turn.STATE_STREAMING -> "stream"
@@ -319,6 +291,11 @@ class AnswerView(
         val payload = JSONObject().put("key", qa.id).put("turns", turns)
             .put("s", JSONObject().put("loading", loc.getString(R.string.thinking)).put("retry", loc.getString(R.string.retry)))
         web.evaluateJavascript("render(${JSONObject.quote(payload.toString())})", null)
+    }
+
+    private fun imageUrl(path: String): String = imageCache.getOrPut(path) {
+        try { "data:image/jpeg;base64," + android.util.Base64.encodeToString(java.io.File(path).readBytes(), android.util.Base64.NO_WRAP) }
+        catch (_: Exception) { "" }
     }
 
     private inner class Bridge {

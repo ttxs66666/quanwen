@@ -26,8 +26,10 @@ import android.view.Display
 
 /**
  * 用系统的录屏接口（MediaProjection）截屏，不需要无障碍。
- * 在圈题页里第一次点「截屏」时系统弹一次授权；之后这个页面开着就一直能截，离开页面就停。
- * 一直保留屏幕最新的一帧，点「截屏」时把它转成图片。
+ * 在圈题页里第一次点「截屏」时系统弹一次授权；圈题页留在屏幕上期间都能截，离开屏幕就停。
+ *
+ * 按需取帧：平时虚拟屏幕不接画面（surface 为空），系统不做任何镜像；
+ * 点「截屏」时才接上，拿到一帧马上断开。第 6~8 版是一直镜像，切后台也不停，会把系统拖卡。
  */
 object ScreenGrabber {
     private var projection: MediaProjection? = null
@@ -35,12 +37,15 @@ object ScreenGrabber {
     private var reader: ImageReader? = null
     private var thread: HandlerThread? = null
     private var bg: Handler? = null
-    private val lock = Any()
-    private var latest: Image? = null
+    private val main = Handler(Looper.getMainLooper())
     private var w = 0
     private var h = 0
     private var dpi = 0
     private lateinit var app: Context
+
+    /** 正在等的那一次截屏。 */
+    @Volatile private var waiting: ((Bitmap?) -> Unit)? = null
+    private val timeout = Runnable { finishGrab(null) }
 
     /** 服务启动好以后调用一次（只调一次）。 */
     var onReady: (() -> Unit)? = null
@@ -56,34 +61,30 @@ object ScreenGrabber {
         bg = Handler(thread!!.looper)
         p.registerCallback(object : MediaProjection.Callback() {
             override fun onStop() { release() }
-        }, Handler(Looper.getMainLooper()))
+        }, main)
         val (sw, sh, d) = screen()
         w = sw; h = sh; dpi = d
         reader = newReader()
+        // 先不接画面：surface 为 null，系统不镜像
         display = p.createVirtualDisplay("quanwen-capture", w, h, dpi,
-            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, reader!!.surface, null, null)
+            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, null, null, null)
         return true
     }
 
-    /** 截一张。屏幕尺寸变了（旋转）会先调整，再等新的一帧。回调在主线程。 */
+    /** 截一张：接上画面，等第一帧，转成图片后马上断开。回调在主线程，失败给 null。 */
     fun grab(onResult: (Bitmap?) -> Unit) {
-        val main = Handler(Looper.getMainLooper())
-        val (sw, sh, d) = screen()
-        var delay = 0L
-        if (sw != w || sh != h) {
-            w = sw; h = sh; dpi = d
-            val old = reader
+        val d = display
+        if (d == null || waiting != null) { onResult(null); return }
+        val (sw, sh, dd) = screen()
+        if (sw != w || sh != h || reader == null) {   // 旋转过：换一个对应尺寸的接收器
+            w = sw; h = sh; dpi = dd
+            reader?.close()
             reader = newReader()
-            display?.resize(w, h, dpi)
-            display?.surface = reader!!.surface
-            synchronized(lock) { latest?.close(); latest = null }
-            old?.close()
-            delay = 400
+            d.resize(w, h, dpi)
         }
-        main.postDelayed({
-            val b = try { toBitmap() } catch (_: Exception) { null }
-            onResult(b)
-        }, delay)
+        waiting = onResult
+        main.postDelayed(timeout, 2500)
+        d.surface = reader!!.surface
     }
 
     fun stop() {
@@ -91,30 +92,52 @@ object ScreenGrabber {
         release()
     }
 
+    private fun finishGrab(b: Bitmap?) {
+        main.removeCallbacks(timeout)
+        try { display?.surface = null } catch (_: Exception) { }   // 断开，不再镜像
+        val cb = waiting
+        waiting = null
+        cb?.invoke(b)
+    }
+
     private fun release() {
-        synchronized(lock) { latest?.close(); latest = null }
+        val cb = waiting
+        waiting = null
+        main.removeCallbacks(timeout)
         display?.release(); display = null
         reader?.close(); reader = null
         projection = null
         thread?.quitSafely(); thread = null; bg = null
+        cb?.invoke(null)
     }
 
-    private fun newReader(): ImageReader = ImageReader.newInstance(w, h, PixelFormat.RGBA_8888, 3).apply {
+    private fun newReader(): ImageReader = ImageReader.newInstance(w, h, PixelFormat.RGBA_8888, 2).apply {
         setOnImageAvailableListener({ r ->
             val img = try { r.acquireLatestImage() } catch (_: Exception) { null } ?: return@setOnImageAvailableListener
-            synchronized(lock) { latest?.close(); latest = img }
+            if (waiting == null) { img.close(); return@setOnImageAvailableListener }
+            val b = try { toBitmap(img) } catch (_: Exception) { null } finally { img.close() }
+            if (b != null && looksBlank(b)) { b.recycle(); return@setOnImageAvailableListener }   // 刚接上时偶尔是黑帧，等下一帧
+            main.post { if (waiting != null) finishGrab(b) else b?.recycle() }
         }, bg)
     }
 
-    private fun toBitmap(): Bitmap? = synchronized(lock) {
-        val img = latest ?: return null
+    private fun toBitmap(img: Image): Bitmap {
         val plane = img.planes[0]
         val pixelStride = plane.pixelStride
         val rowPadding = plane.rowStride - pixelStride * img.width
         val full = Bitmap.createBitmap(img.width + rowPadding / pixelStride, img.height, Bitmap.Config.ARGB_8888)
         plane.buffer.rewind()
         full.copyPixelsFromBuffer(plane.buffer)
-        if (full.width == img.width) full else Bitmap.createBitmap(full, 0, 0, img.width, img.height).also { full.recycle() }
+        return if (full.width == img.width) full else Bitmap.createBitmap(full, 0, 0, img.width, img.height).also { full.recycle() }
+    }
+
+    /** 整张几乎全黑（抽样判断）。 */
+    private fun looksBlank(b: Bitmap): Boolean {
+        for (i in 1..9) for (j in 1..9) {
+            val c = b.getPixel(b.width * i / 10, b.height * j / 10)
+            if ((c and 0xFFFFFF) != 0) return false
+        }
+        return true
     }
 
     @Suppress("DEPRECATION")

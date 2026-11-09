@@ -8,14 +8,15 @@ import java.io.File
 /** 一道圈出的题里的一轮回答：第一次回答、再提示、揭晓。 */
 class Turn(
     val kind: String,                 // KIND_FIRST / KIND_MORE / KIND_REVEAL / KIND_ASK
-    val question: String = "",        // KIND_ASK：用户语音追问的内容（转写后的文字）
+    val question: String = "",        // KIND_ASK：用户追问的文字（语音转写或打字）
+    val imagePath: String = "",       // KIND_ASK：手写追问的字迹图（App 私有目录里的文件）
     var text: String = "",            // 显示给用户的回答正文
     var raw: String = "",             // 模型原始输出（第一轮含类型和题目行）
     var responseId: String? = null,
     var state: Int = STATE_LOADING,
     var error: String? = null,
 ) {
-    fun toJson() = JSONObject().put("kind", kind).put("question", question).put("text", text).put("raw", raw)
+    fun toJson() = JSONObject().put("kind", kind).put("question", question).put("imagePath", imagePath).put("text", text).put("raw", raw)
         .put("responseId", responseId ?: "").put("state", if (state == STATE_DONE) STATE_DONE else STATE_ERROR)
         .put("error", error ?: "")
 
@@ -32,6 +33,7 @@ class Turn(
         fun fromJson(o: JSONObject) = Turn(
             kind = o.optString("kind", KIND_FIRST),
             question = o.optString("question"),
+            imagePath = o.optString("imagePath"),
             text = o.optString("text"),
             raw = o.optString("raw"),
             responseId = o.optString("responseId").ifBlank { null },
@@ -164,12 +166,20 @@ class QaStore(context: Context) {
         File(dir, "${qa.id}_crop.jpg").writeBytes(crop)
     }
 
+    /** 手写追问的字迹图。 */
+    fun saveAskImage(qa: Qa, jpeg: ByteArray): String {
+        val f = File(dir, "${qa.id}_ask_${System.currentTimeMillis()}.jpg")
+        f.writeBytes(jpeg)
+        return f.absolutePath
+    }
+
     fun pageFile(qa: Qa) = File(dir, "${qa.id}_page.jpg")
     fun cropFile(qa: Qa) = File(dir, "${qa.id}_crop.jpg")
 
     fun delete(qa: Qa) {
         list.remove(qa)
         File(dir, "${qa.id}.json").delete(); pageFile(qa).delete(); cropFile(qa).delete()
+        qa.turns.forEach { t -> if (t.imagePath.isNotBlank()) File(t.imagePath).delete() }
     }
 
     companion object {

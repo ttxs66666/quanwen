@@ -124,10 +124,14 @@ class DetailActivity : Activity() {
                         .put("label", when (t.kind) {
                             Turn.KIND_MORE -> getString(R.string.label_more)
                             Turn.KIND_REVEAL -> getString(R.string.label_reveal)
-                            Turn.KIND_ASK -> getString(R.string.label_ask) + t.question
+                            Turn.KIND_ASK -> if (t.imagePath.isNotBlank() && t.question.isBlank()) getString(R.string.label_ask_hand)
+                                             else getString(R.string.label_ask) + t.question
                             else -> ""
                         })
                         .put("text", t.text)
+                        .put("image", if (t.imagePath.isNotBlank()) try {
+                            "data:image/jpeg;base64," + Base64.encodeToString(java.io.File(t.imagePath).readBytes(), Base64.NO_WRAP)
+                        } catch (_: Exception) { "" } else "")
                         .put("state", if (t.state == Turn.STATE_ERROR) "error" else "done")
                         .put("error", t.error ?: ""))
                 }

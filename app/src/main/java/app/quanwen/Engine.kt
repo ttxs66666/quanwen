@@ -64,22 +64,30 @@ object Engine {
         return qa
     }
 
-    /** 再提示一点 / 揭晓：接在上一轮回答后面（previous_response_id），图片不用重发。 */
-    fun followUp(qa: Qa, kind: String, question: String = "") {
+    /**
+     * 再提示一点 / 揭晓 / 追问：接在上一轮回答后面（previous_response_id），题目截图不用重发。
+     * handwriting：手写追问的字迹图（JPEG），有的话和文字一起发给模型。
+     */
+    fun followUp(qa: Qa, kind: String, question: String = "", handwriting: ByteArray? = null, imagePath: String = "") {
         if (qa.busy) return
         val prev = qa.lastResponseId ?: return
-        val turn = Turn(kind, question = question)
+        val path = if (handwriting != null) store.saveAskImage(qa, handwriting) else imagePath
+        val turn = Turn(kind, question = question, imagePath = path)
         qa.turns.add(turn)
         notify(qa, false)
         val text = when (kind) {
             Turn.KIND_MORE -> Prompts.more(qa.lang)
-            Turn.KIND_ASK -> Prompts.ask(qa.lang, question)
+            Turn.KIND_ASK -> if (path.isNotBlank() && question.isBlank()) Prompts.askHandwritten(qa.lang) else Prompts.ask(qa.lang, question)
             else -> Prompts.reveal(qa.lang)
         }
         val body = baseBody(qa.lang)
             .put("previous_response_id", prev)
-            .put("input", JSONArray().put(JSONObject().put("role", "user")
-                .put("content", JSONArray().put(JSONObject().put("type", "input_text").put("text", text)))))
+        val content = JSONArray().put(JSONObject().put("type", "input_text").put("text", text))
+        if (path.isNotBlank()) {
+            val bytes = handwriting ?: try { java.io.File(path).readBytes() } catch (_: Exception) { null }
+            if (bytes != null) content.put(image(bytes))
+        }
+        body.put("input", JSONArray().put(JSONObject().put("role", "user").put("content", content)))
         io.execute { streamInto(qa, turn, body) }
     }
 
@@ -97,7 +105,7 @@ object Engine {
             }
         } else {
             qa.turns.removeAt(index)
-            followUp(qa, turn.kind, turn.question)
+            followUp(qa, turn.kind, turn.question, imagePath = turn.imagePath)
         }
     }
 
@@ -157,7 +165,9 @@ object Engine {
                 raw.length > 200 && type.isEmpty() -> turn.text = raw.trim()   // 模型没按格式输出，直接显示
             }
         } else {
-            turn.text = raw.trim()
+            // 兜底：模型偶尔会给追问也写上「类型 / 题目 / ---」，去掉这几行
+            val (type, _, body) = QaStore.parseFirst(raw, finished)
+            turn.text = if (type.isNotEmpty() && body != null) body else if (type.isNotEmpty()) "" else raw.trim()
         }
         if (turn.text.isNotEmpty()) turn.state = Turn.STATE_STREAMING
         if (!finished) notify(qa, false)

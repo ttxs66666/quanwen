@@ -21,15 +21,34 @@ class AnswerCard(private val svc: QuanwenService) {
     private val screen get() = svc.screenSize()
     private val cardW: Int get() = screen.x.let { w -> max(svc.dpi(300f), min(svc.dpi(460f), (w * 0.6f).toInt())) }
 
+    /** 正在打字：卡片挪到屏幕顶部、正文压矮，输入框留在键盘上方（悬浮窗不会被系统自动推上去）。 */
+    private var typing = false
+    private var yBeforeTyping = 0
+
     private val view = AnswerView(svc, fill = false,
-        maxBodyHeight = { (screen.y * 0.5f).toInt() },
+        maxBodyHeight = { (screen.y * (if (typing) 0.2f else 0.5f)).toInt() },
         onClose = { hide() },
-        onResized = { keepOnScreen() })
+        onResized = { keepOnScreen() },
+        onNeedFocus = { setFocusable(it) })
     private val params = overlayParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, focusable = false)
 
     init { attachDrag(view.header) }
 
     fun applyStrings() = view.applyStrings()
+
+    /** 打字追问时临时允许卡片获得焦点（弹出键盘），打完恢复，不再抢下面 App 的焦点。 */
+    private fun setFocusable(on: Boolean) {
+        if (!attached) return
+        val f = android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+        val want = if (on) params.flags and f.inv() else params.flags or f
+        if (want != params.flags) {
+            params.flags = want
+            if (on) { typing = true; yBeforeTyping = params.y; params.y = svc.dpi(24f) }
+            else if (typing) { typing = false; params.y = yBeforeTyping }
+            svc.wm.updateViewLayout(view, params)
+            view.remeasure()
+        }
+    }
 
     /** 显示某道题。place=true 时把卡片挪到圈的旁边。 */
     fun show(qa: Qa, place: Boolean) {

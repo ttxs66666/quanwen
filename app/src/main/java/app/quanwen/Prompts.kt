@@ -32,6 +32,12 @@ object Prompts {
     else
         "他用语音追问：「$question」。直接回答这个追问。仍然守分寸：只回答他问的，不要顺带说出后面的步骤或最终结果，除非他问的就是这个。最多四句。这段话是语音转写的，可能有错字，请结合这道题的语境理解。"
 
+    /** 书写板上手写的追问：先认字，再回答；第一行复述，方便他确认 AI 没看错。 */
+    fun askHandwritten(lang: String) = if (lang == "en")
+        "They handwrote a follow-up question on a pad (see the image). First line: \"You asked: …\" with what you read. Then answer that question directly. Do not write the Type/Topic lines or the separator. Keep the restraint: answer only what they asked, do not volunteer later steps or the final result unless that is what they are asking for. At most four sentences after the first line."
+    else
+        "他在书写板上手写了一个追问（见图）。第一行写「你问的是：……」，复述你认出的内容；然后直接回答这个追问。不要写类型、题目和分隔线。仍然守分寸：只回答他问的，不要顺带说出后面的步骤或最终结果，除非他问的就是这个。第一行之后最多四句。"
+
     /** 给语音转写的提示，帮它认出专业词。 */
     fun transcribeHint(subject: String, title: String) =
         listOf(subject, title).filter { it.isNotBlank() }.joinToString("。")
@@ -60,8 +66,8 @@ object Prompts {
 ---
 回答正文
 
-只要这条消息里带着截图，就是一道新圈出的题，必须按上面的格式写类型和题目行，哪怕它和前面问过的题一样。
-只有不带截图的追问（再提示、揭晓）才直接写回答正文，不写类型、题目和分隔线。
+只要这条消息里带着整页截图和圈内放大图，就是一道新圈出的题，必须按上面的格式写类型和题目行，哪怕它和前面问过的题一样。
+追问（再提示、揭晓、语音或打字的追问、书写板上手写的追问图）都直接写回答正文，不写类型、题目和分隔线。书写板的字迹图不算新题。
 """.trim()
 
     private val SYSTEM_EN = """
@@ -88,8 +94,8 @@ Topic: one-line transcription of the circled question or idea, at most 15 words,
 ---
 answer body
 
-Any message that contains screenshots is a newly circled question: always use the format above with the Type and Topic lines, even if it repeats an earlier question.
-Only follow-ups without screenshots (more hints, reveal) are just the answer body, without the Type/Topic lines or the separator.
+Any message that contains the whole-page screenshot plus the zoomed circled area is a newly circled question: always use the format above with the Type and Topic lines, even if it repeats an earlier question.
+Follow-ups (more hints, reveal, spoken or typed questions, and a handwritten question image from the writing pad) are just the answer body, without the Type/Topic lines or the separator. A writing-pad image is not a new question.
 """.trim()
 
     private const val MORE_ZH =
