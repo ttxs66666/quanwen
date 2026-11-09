@@ -84,6 +84,11 @@
     <string name="capture_channel">截屏</string>
     <string name="capture_notice">圈问可以截屏（只在圈题页用，不存相册；离开圈题页就停止）</string>
     <string name="capture_denied">没有得到截屏授权</string>
+    <string name="capture_no_frame">截屏失败：系统没送来画面（%1$s）。再点一次「截屏」重新授权试试；还不行就用系统截屏，圈问会自动载入。</string>
+    <string name="capture_black">截屏失败：截到的是一片黑（%1$s），这个画面可能不让截。可以改用系统截屏。</string>
+    <string name="capture_stopped">截屏已经被系统停止了，再点一次「截屏」重新授权。</string>
+    <string name="capture_reconsent">这台设备要换一种截屏方式，请再允许一次。</string>
+    <string name="capture_error">截屏出错：%1$s</string>
     <string name="paste_empty">剪贴板里没有图片。先复制一张截图，再点「粘贴」。</string>
     <string name="drop_hint">松手，载入这张图</string>
     <string name="drop_failed">没拿到图片：这个来源不支持拖进来。试试「最新截图」「相册」或「粘贴」。</string>

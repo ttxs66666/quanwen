@@ -84,6 +84,11 @@
     <string name="capture_channel">Screen capture</string>
     <string name="capture_notice">Quanwen can take screenshots (used only on the circle page, never saved to the gallery; stops when you leave the page)</string>
     <string name="capture_denied">Screen capture was not allowed</string>
+    <string name="capture_no_frame">Screenshot failed: the system sent no picture (%1$s). Tap Screenshot again to allow it again; if it still fails, take a system screenshot and Quanwen loads it automatically.</string>
+    <string name="capture_black">Screenshot failed: the picture came back black (%1$s); this screen may block capture. Try a system screenshot instead.</string>
+    <string name="capture_stopped">Screen capture was stopped by the system. Tap Screenshot again to allow it.</string>
+    <string name="capture_reconsent">This device needs a different capture method. Please allow screen capture once more.</string>
+    <string name="capture_error">Screenshot error: %1$s</string>
     <string name="paste_empty">No image on the clipboard. Copy a screenshot first, then tap Paste.</string>
     <string name="drop_hint">Drop to load this image</string>
     <string name="drop_failed">Couldn\'t get an image: this source doesn\'t support dropping here. Try Latest screenshot, Gallery or Paste.</string>

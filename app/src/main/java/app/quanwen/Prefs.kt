@@ -62,6 +62,11 @@ class Prefs(context: Context) {
         get() = sp.getString("currentSessionId", "") ?: ""
         set(v) = sp.edit().putString("currentSessionId", v).apply()
 
+    /** 这台设备用哪种方式截屏（[ScreenGrabber.Mode] 的名字），试出来以后记住。 */
+    var captureMode: String
+        get() = sp.getString("captureMode", "") ?: ""
+        set(v) = sp.edit().putString("captureMode", v).apply()
+
     companion object {
         const val DEFAULT_MODEL = "gpt-6.1-terra"
     }

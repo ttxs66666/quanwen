@@ -74,13 +74,29 @@ class CircleActivity : Activity() {
         }
     }
 
-    /** 圈问离开屏幕（切后台、被别的 App 盖住）就停止录屏；回来再截时重新授权一次。 */
+    /**
+     * 圈问离开屏幕（切后台、被别的 App 盖住）一会儿就停止录屏；回来再截时重新授权一次。
+     * 不马上停：授权时系统可能短暂盖住圈问（比如鸿蒙自己的提示），马上停会让刚授权的截屏失败。
+     */
     override fun onStop() {
         super.onStop()
-        if (ScreenGrabber.active && !isChangingConfigurations) stopService(Intent(this, CaptureService::class.java))
+        if (!isChangingConfigurations) main.postDelayed(stopCapture, STOP_GRACE_MS)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        main.removeCallbacks(stopCapture)
+    }
+
+    private val stopCapture: Runnable = Runnable {
+        when {
+            ScreenGrabber.busy -> main.postDelayed(stopCapture, 1000)   // 正在截，截完再停
+            ScreenGrabber.active -> stopService(Intent(this, CaptureService::class.java))
+        }
     }
 
     override fun onDestroy() {
+        main.removeCallbacks(stopCapture)
         if (ScreenGrabber.active) stopService(Intent(this, CaptureService::class.java))
         Engine.removeListener(onQaChanged)
         observer?.let { contentResolver.unregisterContentObserver(it) }
@@ -181,6 +197,8 @@ class CircleActivity : Activity() {
     private fun show(b: Bitmap) {
         lasso.setImage(b)
         empty.visibility = View.GONE
+        hint.text = getString(R.string.circle_hint)
+        hint.setTextColor(Colors.MUTED)
     }
 
     /** 最新截图。userAsked=false 时（刚打开页面）没权限就先不弹窗请求。 */
@@ -217,18 +235,40 @@ class CircleActivity : Activity() {
     private fun captureScreen() {
         followLatest = false
         if (ScreenGrabber.active) { grabNow(); return }
+        askCaptureConsent()
+    }
+
+    private fun askCaptureConsent() {
         val mpm = getSystemService(MediaProjectionManager::class.java)
         val i = if (Build.VERSION.SDK_INT >= 34) mpm.createScreenCaptureIntent(MediaProjectionConfig.createConfigForDefaultDisplay())
                 else mpm.createScreenCaptureIntent()
-        try { startActivityForResult(i, REQ_CAPTURE) } catch (e: Exception) { toast(getString(R.string.capture_failed)) }
+        try { startActivityForResult(i, REQ_CAPTURE) }
+        catch (e: Exception) { captureProblem(getString(R.string.capture_error, e.javaClass.simpleName)) }
     }
 
     private fun grabNow() {
-        ScreenGrabber.grab { b ->
-            if (b == null) { toast(getString(R.string.capture_failed)); return@grab }
-            loadedImageId = -1L
-            show(cropOutSelf(b))
+        ScreenGrabber.grab { b, fail ->
+            if (b != null) {
+                loadedImageId = -1L
+                show(cropOutSelf(b))
+                return@grab
+            }
+            val info = ScreenGrabber.describe()
+            when (fail) {
+                ScreenGrabber.Fail.BUSY -> {}
+                ScreenGrabber.Fail.NEED_CONSENT -> { toast(getString(R.string.capture_reconsent), long = true); askCaptureConsent() }
+                ScreenGrabber.Fail.BLACK -> captureProblem(getString(R.string.capture_black, info))
+                ScreenGrabber.Fail.STOPPED -> captureProblem(getString(R.string.capture_stopped))
+                else -> captureProblem(getString(R.string.capture_no_frame, info))
+            }
         }
+    }
+
+    /** 截屏没成：长一点的提示，同时留在顶部的说明里（提示一闪就没了，朋友要能照着告诉我们）。 */
+    private fun captureProblem(msg: String) {
+        toast(msg, long = true)
+        hint.text = msg
+        hint.setTextColor(Colors.ACCENT)
     }
 
     /** 分屏时把圈问自己这半屏裁掉，只留笔记那一半；全屏时不裁。 */
@@ -300,7 +340,10 @@ class CircleActivity : Activity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQ_CAPTURE) {
             if (resultCode != RESULT_OK || data == null) { toast(getString(R.string.capture_denied)); return }
-            ScreenGrabber.onReady = { main.postDelayed({ grabNow() }, 600) }   // 等第一帧画面进来
+            ScreenGrabber.onReady = { error ->   // 等授权框退掉、第一帧画面进来
+                if (error == null) main.postDelayed({ grabNow() }, 600)
+                else captureProblem(getString(R.string.capture_error, error))
+            }
             startForegroundService(Intent(this, CaptureService::class.java)
                 .putExtra(CaptureService.EXTRA_CODE, resultCode).putExtra(CaptureService.EXTRA_DATA, data))
             return
@@ -404,7 +447,8 @@ class CircleActivity : Activity() {
 
     // ---------- 小工具 ----------
 
-    private fun toast(s: String) = Toast.makeText(this, s, Toast.LENGTH_SHORT).show()
+    private fun toast(s: String, long: Boolean = false) =
+        Toast.makeText(this, s, if (long) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
 
     private fun button(label: String, onClick: () -> Unit) = TextView(this).apply {
         text = label; textSize = 14f; setTextColor(Colors.INK); gravity = Gravity.CENTER
@@ -424,6 +468,7 @@ class CircleActivity : Activity() {
         private const val REQ_CAMERA = 2
         private const val REQ_PERMISSION = 3
         private const val REQ_CAPTURE = 4
+        private const val STOP_GRACE_MS = 8000L
 
         fun open(context: Context, source: String) =
             context.startActivity(Intent(context, CircleActivity::class.java).putExtra(EXTRA_SOURCE, source))
