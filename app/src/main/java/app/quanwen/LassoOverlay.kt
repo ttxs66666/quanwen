@@ -19,7 +19,7 @@ import kotlin.math.max
  * 抬笔后停 [SEND_DELAY_MS] 就发送；这段时间里接着画，会并进同一个圈。
  */
 class LassoOverlay(
-    private val svc: QuanwenService,
+    private val svc: FloatHost,
     private val shot: Bitmap,
     private val onDone: (List<FloatArray>) -> Unit,
     private val onCancel: () -> Unit,
@@ -75,7 +75,7 @@ class LassoOverlay(
     }
 
     fun show() {
-        val p = overlayParams(screen.x, screen.y, focusable = true)
+        val p = overlayParams(screen.x, screen.y, focusable = true, type = svc.windowType)
         p.x = 0; p.y = 0
         svc.wm.addView(root, p)
         root.isFocusableInTouchMode = true

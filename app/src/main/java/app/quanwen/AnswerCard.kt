@@ -11,7 +11,7 @@ import kotlin.math.min
  * 悬浮模式下的回答卡片：把 [AnswerView] 放进一个无障碍浮层窗口，负责摆放、拖动、显示和隐藏。
  * 关掉只是隐藏，点悬浮条上的「卡」再拿出来。
  */
-class AnswerCard(private val svc: QuanwenService) {
+class AnswerCard(private val svc: FloatHost) {
     val current: Qa? get() = view.current
     var visible = false
         private set
@@ -30,7 +30,7 @@ class AnswerCard(private val svc: QuanwenService) {
         onClose = { hide() },
         onResized = { keepOnScreen() },
         onNeedFocus = { setFocusable(it) })
-    private val params = overlayParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, focusable = false)
+    private val params = overlayParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, focusable = false, type = svc.windowType)
 
     init { attachDrag(view.header) }
 

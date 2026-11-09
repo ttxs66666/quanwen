@@ -17,11 +17,14 @@ import android.widget.TextView
 import android.widget.Toast
 import org.json.JSONObject
 
-/** 设置页：开无障碍、科目、语言、模型、历史记录入口。 */
+/** 设置页：开悬浮条（悬浮窗或无障碍）、科目、语言、模型、历史记录入口。 */
 class MainActivity : Activity() {
     private lateinit var prefs: Prefs
     private lateinit var col: LinearLayout
     private lateinit var status: TextView
+    private lateinit var floatBtn: TextView
+    /** 刚去系统设置里给「显示在其他应用上层」，回来就开悬浮窗。 */
+    private var wantFloat = false
     private lateinit var subject: EditText
     private lateinit var model: EditText
     private lateinit var baseUrl: EditText
@@ -44,7 +47,41 @@ class MainActivity : Activity() {
         checkUpdate(silent = true)
     }
 
-    override fun onResume() { super.onResume(); updateStatus() }
+    override fun onResume() {
+        super.onResume()
+        // 刚给了权限，或者悬浮窗方式开着但被系统清掉了：打开 App 就重新开起来
+        val canFloat = Settings.canDrawOverlays(this) && QuanwenService.instance == null && FloatService.instance == null
+        if (canFloat && (wantFloat || prefs.floatMode)) startFloat()
+        wantFloat = false
+        updateStatus()
+    }
+
+    // ---------- 悬浮窗方式 ----------
+
+    private fun onFloatClick() {
+        if (FloatService.instance != null) {
+            FloatService.stop(this)
+            window.decorView.postDelayed({ updateStatus() }, 300)
+            return
+        }
+        if (QuanwenService.instance != null) { Toast.makeText(this, R.string.float_a11y_on, Toast.LENGTH_SHORT).show(); return }
+        if (!Settings.canDrawOverlays(this)) {
+            wantFloat = true
+            Toast.makeText(this, R.string.float_allow_overlay, Toast.LENGTH_LONG).show()
+            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+            return
+        }
+        startFloat()
+    }
+
+    private fun startFloat() {
+        prefs.floatMode = true
+        try { FloatService.start(this) } catch (_: Exception) { }
+        window.decorView.postDelayed({
+            updateStatus()
+            if (FloatService.instance == null && QuanwenService.instance == null) Toast.makeText(this, R.string.float_failed, Toast.LENGTH_LONG).show()
+        }, 1000)
+    }
     override fun onPause() { super.onPause(); save() }
 
     private fun save() {
@@ -132,10 +169,19 @@ class MainActivity : Activity() {
         col.addView(text(getString(R.string.app_name), 30f, Colors.INK, bold = true))
         col.addView(text(getString(R.string.main_tagline), 15f, Colors.MUTED).apply { setPadding(0, dpi(4f), 0, dpi(20f)) })
 
-        // 无障碍状态
+        // 悬浮条状态
         status = text("", 16f, Colors.INK, bold = true)
         col.addView(status)
-        col.addView(text(getString(R.string.a11y_help), 13f, Colors.MUTED).apply { setPadding(0, dpi(4f), 0, dpi(8f)) })
+
+        // 方式一：悬浮窗（不用无障碍）
+        col.addView(text(getString(R.string.float_title), 14f, Colors.INK, bold = true).apply { setPadding(0, dpi(14f), 0, 0) })
+        col.addView(text(getString(R.string.float_help), 13f, Colors.MUTED).apply { setPadding(0, dpi(4f), 0, dpi(2f)) })
+        floatBtn = button(getString(R.string.float_start)) { onFloatClick() }
+        col.addView(row(floatBtn))
+
+        // 方式二：无障碍
+        col.addView(text(getString(R.string.a11y_title), 14f, Colors.INK, bold = true).apply { setPadding(0, dpi(18f), 0, 0) })
+        col.addView(text(getString(R.string.a11y_help), 13f, Colors.MUTED).apply { setPadding(0, dpi(4f), 0, dpi(2f)) })
         col.addView(row(
             button(getString(R.string.open_a11y)) { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) },
             button(getString(R.string.open_app_info)) {
@@ -176,7 +222,7 @@ class MainActivity : Activity() {
         section(getString(R.string.sec_lang))
         col.addView(choice(listOf("zh" to "中文", "en" to "English"), prefs.lang) { v ->
             save(); prefs.lang = v
-            QuanwenService.instance?.refreshLabels()
+            FloatHost.current?.refreshLabels()
             recreate()
         })
 
@@ -196,9 +242,11 @@ class MainActivity : Activity() {
     }
 
     private fun updateStatus() {
-        val on = QuanwenService.instance != null
-        status.text = getString(if (on) R.string.status_on else R.string.status_off)
-        status.setTextColor(if (on) 0xFF2E7D4F.toInt() else Colors.ACCENT)
+        val a11y = QuanwenService.instance != null
+        val float = FloatService.instance != null
+        status.text = getString(when { a11y -> R.string.status_on_a11y; float -> R.string.status_on_float; else -> R.string.status_off })
+        status.setTextColor(if (a11y || float) 0xFF2E7D4F.toInt() else Colors.ACCENT)
+        floatBtn.text = getString(if (float) R.string.float_stop else R.string.float_start)
     }
 
     private fun testConnection() {

@@ -62,6 +62,11 @@ class Prefs(context: Context) {
         get() = sp.getString("currentSessionId", "") ?: ""
         set(v) = sp.edit().putString("currentSessionId", v).apply()
 
+    /** 用户开着悬浮窗方式（[FloatService]）。打开 App 时如果它没在运行，就自动重新开起来。 */
+    var floatMode: Boolean
+        get() = sp.getBoolean("floatMode", false)
+        set(v) = sp.edit().putBoolean("floatMode", v).apply()
+
     /** 这台设备用哪种方式截屏（[ScreenGrabber.Mode] 的名字），试出来以后记住。 */
     var captureMode: String
         get() = sp.getString("captureMode", "") ?: ""

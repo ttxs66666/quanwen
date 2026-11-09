@@ -40,7 +40,10 @@
 ### 安装
 
 1. 到 [Releases](https://github.com/ttxs66666/quanwen/releases) 下载最新的 `quanwen-v*.apk`，在平板上安装。需要 Android 11 及以上。
-2. 打开「圈问」，点「打开无障碍设置」，把「圈问悬浮条」打开。如果开关是灰的，先点「应用信息」，在右上角菜单里选「允许受限设置」。实在开不了，就用「App 内圈题」。
+2. 打开「圈问」，开启悬浮条，两种方式任选一种：
+   - **悬浮窗（推荐）**：点「开启悬浮窗」，允许「显示在其他应用上层」。第一次点「圈」时系统会问一次录屏授权，之后直接截屏；手机重启或录屏被停止后再问一次。不用开无障碍。
+   - **无障碍**：点「打开无障碍设置」，把「圈问悬浮条」打开。如果开关是灰的，先点「应用信息」，在右上角菜单里选「允许受限设置」。有些手机清理后台时会把无障碍关掉，这种手机用悬浮窗方式更省事。
+   - 两种都开不了（比如鸿蒙的卓易通），就用「App 内圈题」。
 3. 在设置页填入你自己的 OpenAI API Key，点「测试连接」。安装包里不带任何密钥。
 4. 以后在设置页点「检查更新」就能升级，本机保存的密钥和记录都不会丢。
 
@@ -53,7 +56,8 @@
 ### 开发
 
 - 用 Kotlin 写，没有用 AndroidX。
-- 截屏用无障碍服务的 `takeScreenshot`。
+- 悬浮窗方式：`TYPE_APPLICATION_OVERLAY` 窗口加前台服务，截屏用录屏接口（MediaProjection），只在点「圈」时取一帧。
+- 无障碍方式：截屏用无障碍服务的 `takeScreenshot`。
 - 回答卡片用 WebView 加 KaTeX 渲染。
 - 设计文档见 [设计.md](设计.md)。
 
@@ -105,7 +109,10 @@ The point: you ask the questions and do the reasoning; the AI only nudges you wh
 ### Install
 
 1. Download the latest `quanwen-v*.apk` from [Releases](https://github.com/ttxs66666/quanwen/releases) and install it on your tablet. Android 11 or later is required.
-2. Open Quanwen, tap "Accessibility settings" and turn on "Quanwen float bar". If the switch is greyed out, open App info and choose "Allow restricted settings" from the top-right menu. If it still can't be turned on, use "Circle in the app".
+2. Open Quanwen and turn on the float bar in either of two ways:
+   - **Overlay (recommended)**: tap "Turn on overlay" and allow "Display over other apps". The first time you tap the circle button the system asks once for screen-capture permission; after that screenshots work directly, and it asks again after a restart or if capture was stopped. No accessibility needed.
+   - **Accessibility**: tap "Accessibility settings" and turn on "Quanwen float bar". If the switch is greyed out, open App info and choose "Allow restricted settings" from the top-right menu. Some phones turn accessibility off when they clean up background apps; on those, overlay mode is easier.
+   - If neither works (for example HarmonyOS with Zhuoyitong), use "Circle in the app".
 3. Enter your own OpenAI API key in Settings and tap "Test connection". The APK ships without any key.
 4. Later, tap "Check for updates" in Settings to upgrade. Your saved key and history stay on the device.
 
@@ -118,7 +125,8 @@ The point: you ask the questions and do the reasoning; the AI only nudges you wh
 ### Development
 
 - Written in Kotlin, without AndroidX.
-- Screen capture uses the accessibility service's `takeScreenshot`.
+- Overlay mode: `TYPE_APPLICATION_OVERLAY` windows plus a foreground service; screenshots come from the screen-capture API (MediaProjection), one frame per tap of the circle button.
+- Accessibility mode: screenshots come from the accessibility service's `takeScreenshot`.
 - The answer card is rendered with a WebView and KaTeX.
 - The design notes (in Chinese) are in [设计.md](设计.md).
 

@@ -47,15 +47,25 @@ fun rounded(color: Int, radius: Float, strokeColor: Int = 0, strokeWidth: Int = 
     if (strokeWidth > 0) setStroke(strokeWidth, strokeColor)
 }
 
-/** 无障碍浮层的窗口参数。focusable=false 时不抢输入焦点，点到窗口外的触摸照常传给下面的 App。 */
-fun overlayParams(width: Int, height: Int, focusable: Boolean): WindowManager.LayoutParams {
+/** 提示一句话：在悬浮条的浮层里用气泡（[FloatHost.toast]），在普通页面里用 Toast。 */
+fun Context.say(msg: String, long: Boolean = false) {
+    val host = this as? FloatHost
+    if (host != null) host.toast(msg, long)
+    else android.widget.Toast.makeText(this, msg, if (long) android.widget.Toast.LENGTH_LONG else android.widget.Toast.LENGTH_SHORT).show()
+}
+
+/**
+ * 浮层的窗口参数。type 是 TYPE_ACCESSIBILITY_OVERLAY（无障碍方式）或 TYPE_APPLICATION_OVERLAY（悬浮窗方式）。
+ * focusable=false 时不抢输入焦点，点到窗口外的触摸照常传给下面的 App。
+ */
+fun overlayParams(width: Int, height: Int, focusable: Boolean, type: Int): WindowManager.LayoutParams {
     var flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
         WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
     if (!focusable) flags = flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
         WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
     return WindowManager.LayoutParams(
         width, height,
-        WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+        type,
         flags, PixelFormat.TRANSLUCENT,
     ).apply {
         gravity = Gravity.TOP or Gravity.START

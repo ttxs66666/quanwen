@@ -57,6 +57,9 @@ object ScreenGrabber {
     var mode = Mode.DETACH
         private set
 
+    /** 撑着这次录屏的前台服务：圈题页用 [CaptureService]，悬浮窗方式用 [FloatService]。 */
+    private var owner: Class<out Service>? = null
+
     // 最新一帧：只在接着画面时更新（后台线程写，主线程读）
     private val lock = Any()
     private var latest: Image? = null
@@ -82,8 +85,10 @@ object ScreenGrabber {
     /** 给出错提示用的设备信息。 */
     fun describe(): String = "Android ${Build.VERSION.RELEASE} · API ${Build.VERSION.SDK_INT} · M${mode.ordinal + 1}"
 
-    fun start(ctx: Context, resultCode: Int, data: Intent) {
+    fun start(ctx: Context, resultCode: Int, data: Intent, by: Class<out Service>) {
+        if (projection != null) { owner = null; stop() }   // 换一个授权：先停掉旧的（不关任何服务）
         app = ctx.applicationContext
+        owner = by
         mode = savedMode()
         val mpm = ctx.getSystemService(MediaProjectionManager::class.java)
         val p = mpm.getMediaProjection(resultCode, data) ?: throw IllegalStateException("getMediaProjection = null")
@@ -128,7 +133,9 @@ object ScreenGrabber {
         main.post { check() }
     }
 
-    fun stop() {
+    /** 停止录屏。给了 from 时，只有这次录屏是它撑着的才停（圈题页和悬浮窗互不干扰）。 */
+    fun stop(from: Class<out Service>? = null) {
+        if (from != null && from != owner) return
         val p = projection
         release()
         try { p?.stop() } catch (_: Exception) { }
@@ -249,7 +256,9 @@ object ScreenGrabber {
         val wasActive = projection != null
         projection = null
         thread?.quitSafely(); thread = null; bg = null
-        if (wasActive) try { app.stopService(Intent(app, CaptureService::class.java)) } catch (_: Exception) { }
+        // 圈题页的录屏服务只为录屏而开，录屏停了就关掉它；悬浮窗服务还要留着悬浮条，下次点「圈」再授权
+        if (wasActive && owner == CaptureService::class.java) try { app.stopService(Intent(app, CaptureService::class.java)) } catch (_: Exception) { }
+        owner = null
         cb?.invoke(null, Fail.STOPPED)
     }
 
@@ -310,7 +319,7 @@ class CaptureService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
-            ScreenGrabber.stop()
+            ScreenGrabber.stop(CaptureService::class.java)
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             return START_NOT_STICKY
@@ -321,10 +330,10 @@ class CaptureService : Service() {
             @Suppress("DEPRECATION")
             val data: Intent = (if (Build.VERSION.SDK_INT >= 33) intent?.getParcelableExtra(EXTRA_DATA, Intent::class.java)
                                 else intent?.getParcelableExtra(EXTRA_DATA)) ?: throw IllegalStateException("no consent data")
-            ScreenGrabber.start(this, code, data)
+            ScreenGrabber.start(this, code, data, CaptureService::class.java)
             null
         } catch (e: Exception) {
-            ScreenGrabber.stop()
+            ScreenGrabber.stop(CaptureService::class.java)
             stopSelf()
             "${e.javaClass.simpleName}: ${e.message ?: ""}".take(160)
         }
@@ -333,7 +342,7 @@ class CaptureService : Service() {
         return START_NOT_STICKY
     }
 
-    override fun onDestroy() { ScreenGrabber.stop(); super.onDestroy() }
+    override fun onDestroy() { ScreenGrabber.stop(CaptureService::class.java); super.onDestroy() }
 
     private fun notification(): Notification {
         val loc = Lang.wrap(this)

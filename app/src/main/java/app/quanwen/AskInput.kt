@@ -16,7 +16,6 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -264,7 +263,7 @@ class AskInputView(
 
     // ---------- 小工具 ----------
 
-    private fun toast(id: Int) = Toast.makeText(ctx, loc.getString(id), Toast.LENGTH_SHORT).show()
+    private fun toast(id: Int) = ctx.say(loc.getString(id))
 
     private fun row() = LinearLayout(ctx).apply { orientation = HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
 

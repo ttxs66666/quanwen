@@ -16,7 +16,7 @@ import android.widget.ProgressBar
 import kotlin.math.abs
 
 /** 竖着的悬浮条：上面「圈」，下面「卡」。可拖动，长按打开 App。 */
-class FloatBar(private val svc: QuanwenService) {
+class FloatBar(private val svc: FloatHost) {
     private val prefs = Prefs(svc)
     private val btn = svc.dpi(54f)
     private val root = LinearLayout(svc).apply {
@@ -34,7 +34,7 @@ class FloatBar(private val svc: QuanwenService) {
         visibility = View.GONE
     }
     private val spinner = ProgressBar(svc).apply { isIndeterminate = true; visibility = View.GONE }
-    private val params = overlayParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, focusable = false)
+    private val params = overlayParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, focusable = false, type = svc.windowType)
     private var attached = false
 
     init {

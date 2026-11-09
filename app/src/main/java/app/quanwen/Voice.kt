@@ -131,7 +131,7 @@ object VoiceRecorder {
     const val SILENCE_PEAK = 900
 }
 
-/** 透明页面，只用来请求麦克风权限（悬浮卡片在无障碍服务里，没法直接弹权限框）。 */
+/** 透明页面，只用来请求麦克风权限（悬浮卡片在服务里，没法直接弹权限框）。 */
 class MicPermissionActivity : Activity() {
     override fun attachBaseContext(base: Context) = super.attachBaseContext(Lang.wrap(base))
 
@@ -144,7 +144,9 @@ class MicPermissionActivity : Activity() {
     @Deprecated("Deprecated in Java")
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        Toast.makeText(this, if (VoiceRecorder.hasPermission(this)) R.string.mic_granted else R.string.mic_needed, Toast.LENGTH_LONG).show()
+        val granted = VoiceRecorder.hasPermission(this)
+        if (granted) FloatService.micGranted(this)   // 悬浮窗方式：前台服务要带上麦克风类型，才能在别的 App 上面录音
+        Toast.makeText(this, if (granted) R.string.mic_granted else R.string.mic_needed, Toast.LENGTH_LONG).show()
         finish()
     }
 

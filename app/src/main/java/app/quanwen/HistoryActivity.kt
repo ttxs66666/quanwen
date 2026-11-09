@@ -53,7 +53,7 @@ class HistoryActivity : Activity() {
             AlertDialog.Builder(this).setMessage(R.string.delete_confirm)
                 .setPositiveButton(R.string.delete) { _, _ ->
                     store.delete(qa); adapter.notifyDataSetChanged()
-                    QuanwenService.instance?.onQaDeleted()
+                    FloatHost.current?.onQaDeleted()
                 }
                 .setNegativeButton(R.string.cancel, null).show()
             true
