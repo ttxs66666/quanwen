@@ -22,7 +22,7 @@ code=$((code + 1))
 name="0.$code"
 sed -i "s/^VERSION_CODE=.*/VERSION_CODE=$code/; s/^VERSION_NAME=.*/VERSION_NAME=$name/" version.properties
 
-./gradlew assembleRelease --console=plain -q
+./gradlew assembleRelease --console=plain -q --max-workers=2   # 本机约定：日常任务最多用 2 个核
 apk="app/build/outputs/apk/release/app-release.apk"
 python -I tools/no_key_check.py "$apk"
 mkdir -p dist

@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 长按桌面图标出现的快捷方式：直接打开 App 内圈题 -->
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="notes" android:enabled="true" android:icon="@drawable/ic_card"
+        android:shortcutShortLabel="@string/shortcut_notes">
+        <intent android:action="android.intent.action.VIEW"
+            android:targetPackage="app.quanwen" android:targetClass="app.quanwen.ShelfActivity" />
+    </shortcut>
     <shortcut android:shortcutId="latest" android:enabled="true" android:icon="@drawable/ic_lasso"
         android:shortcutShortLabel="@string/shortcut_latest">
         <intent android:action="android.intent.action.VIEW"

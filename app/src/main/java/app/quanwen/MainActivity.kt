@@ -167,7 +167,9 @@ class MainActivity : Activity() {
         setContentView(scroll)
 
         col.addView(text(getString(R.string.app_name), 30f, Colors.INK, bold = true))
-        col.addView(text(getString(R.string.main_tagline), 15f, Colors.MUTED).apply { setPadding(0, dpi(4f), 0, dpi(20f)) })
+        col.addView(text(getString(R.string.main_tagline), 15f, Colors.MUTED).apply { setPadding(0, dpi(4f), 0, dpi(12f)) })
+        col.addView(row(button(getString(R.string.open_notes)) { ShelfActivity.open(this) }.apply { textSize = 16f }))
+        col.addView(View(this), LinearLayout.LayoutParams(1, dpi(12f)))
 
         // 悬浮条状态
         status = text("", 16f, Colors.INK, bold = true)

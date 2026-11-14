@@ -109,6 +109,20 @@
     <string name="drop_failed">Couldn\'t get an image: this source doesn\'t support dropping here. Try Latest screenshot, Gallery or Paste.</string>
     <string name="shortcut_latest">Circle latest screenshot</string>
     <string name="shortcut_camera">Circle a photo</string>
+    <string name="shortcut_notes">Notebooks</string>
+    <string name="open_notes">📒 Notebooks</string>
+    <string name="shelf_title">Notebooks</string>
+    <string name="shelf_new">New</string>
+    <string name="shelf_new_title">New notebook</string>
+    <string name="shelf_default_title">Notebook %1$d</string>
+    <string name="shelf_cover">Cover</string>
+    <string name="shelf_create">Create</string>
+    <string name="shelf_meta">%1$d pages · %2$s</string>
+    <string name="shelf_rename">Rename</string>
+    <string name="shelf_change_cover">Change cover</string>
+    <string name="shelf_delete_confirm">Delete \"%1$s\"? All its pages are deleted too and can\'t be recovered.</string>
+    <string name="note_undo">Undo</string>
+    <string name="note_redo">Redo</string>
 
     <string name="sec_update">Updates</string>
     <string name="version_now">Version %1$s (build %2$d)</string>

@@ -67,6 +67,15 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("floatMode", false)
         set(v) = sp.edit().putBoolean("floatMode", v).apply()
 
+    /** 笔记本里上次用的笔：颜色和粗细的档位（0..2）。 */
+    var noteColor: Int
+        get() = sp.getInt("noteColor", 0)
+        set(v) = sp.edit().putInt("noteColor", v).apply()
+
+    var noteWidth: Int
+        get() = sp.getInt("noteWidth", 1)
+        set(v) = sp.edit().putInt("noteWidth", v).apply()
+
     /** 这台设备用哪种方式截屏（[ScreenGrabber.Mode] 的名字），试出来以后记住。 */
     var captureMode: String
         get() = sp.getString("captureMode", "") ?: ""

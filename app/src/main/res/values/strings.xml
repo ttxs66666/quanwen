@@ -109,6 +109,20 @@
     <string name="drop_failed">没拿到图片：这个来源不支持拖进来。试试「最新截图」「相册」或「粘贴」。</string>
     <string name="shortcut_latest">圈最新截图</string>
     <string name="shortcut_camera">拍照圈题</string>
+    <string name="shortcut_notes">笔记本</string>
+    <string name="open_notes">📒 笔记本</string>
+    <string name="shelf_title">笔记本</string>
+    <string name="shelf_new">新建</string>
+    <string name="shelf_new_title">新建笔记本</string>
+    <string name="shelf_default_title">笔记本 %1$d</string>
+    <string name="shelf_cover">封面</string>
+    <string name="shelf_create">创建</string>
+    <string name="shelf_meta">%1$d 页 · %2$s</string>
+    <string name="shelf_rename">重命名</string>
+    <string name="shelf_change_cover">换封面</string>
+    <string name="shelf_delete_confirm">删除「%1$s」？里面的笔记会一起删掉，删了不能恢复。</string>
+    <string name="note_undo">撤回</string>
+    <string name="note_redo">还原</string>
 
     <string name="sec_update">更新</string>
     <string name="version_now">当前版本 %1$s（第 %2$d 版）</string>

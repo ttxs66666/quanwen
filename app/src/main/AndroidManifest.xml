@@ -32,6 +32,10 @@
         <provider android:name=".CameraFileProvider" android:authorities="app.quanwen.camera"
             android:exported="false" android:grantUriPermissions="true" />
         <activity android:name=".HistoryActivity" android:exported="false" />
+        <!-- 自带笔记本：书架和编辑页 -->
+        <activity android:name=".ShelfActivity" android:exported="false" />
+        <activity android:name=".NoteActivity" android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden" />
         <activity android:name=".DetailActivity" android:exported="false" />
         <receiver android:name=".UpdateReceiver" android:exported="false" />
         <activity android:name=".MicPermissionActivity" android:exported="false"
