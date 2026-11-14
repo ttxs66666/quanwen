@@ -9,10 +9,10 @@ object Prompts {
      * 第一轮的文字说明。notebook=true：在圈问自带笔记本里圈的（圈是橙色荧光，没有按钮，追问靠接着写再圈）；
      * hasPrev：圈在页面上部，附上了上一页。
      */
-    fun firstTurnText(lang: String, subject: String, history: String, notebook: Boolean = false, hasPrev: Boolean = false): String {
+    fun firstTurnText(lang: String, book: String, history: String, notebook: Boolean = false, hasPrev: Boolean = false): String {
         val sb = StringBuilder()
         if (lang == "en") {
-            if (subject.isNotBlank()) sb.append("Subject: ").append(subject).append("\n")
+            if (book.isNotBlank()) sb.append("This notebook is called \"").append(book).append("\"; that is the context, not a topic you must bring up.\n")
             if (history.isNotBlank()) sb.append("Earlier in this study session (oldest first):\n").append(history).append("\n")
             if (notebook) {
                 sb.append("This is a page of handwritten notes in Quanwen's built-in notebook. Image 1 is the whole page; the orange highlighter loop marks the current question (the loop is a selection mark, not something they wrote). Image 2 is a zoomed view of the circled area")
@@ -24,7 +24,7 @@ object Prompts {
                 sb.append("This is a newly circled question: start with the Type and Topic lines.")
             }
         } else {
-            if (subject.isNotBlank()) sb.append("科目：").append(subject).append("\n")
+            if (book.isNotBlank()) sb.append("这本笔记本叫「").append(book).append("」，这是背景，不是必须提起的话题。\n")
             if (history.isNotBlank()) sb.append("本次学习前面的问答（从早到晚）：\n").append(history).append("\n")
             if (notebook) {
                 sb.append("这是圈问自带笔记本里的一页手写笔记。第一张是整页，橙色荧光笔圈出的是当前问题（荧光圈是圈选标记，不是他写的内容）；第二张是圈内区域的放大图")
@@ -77,8 +77,8 @@ They asked for these modes on purpose, so the restraint rule does not apply. If 
         "他在书写板上手写了一个追问（见图）。第一行写「你问的是：……」，复述你认出的内容；然后直接回答这个追问。不要写类型、题目和分隔线。仍然守分寸：只回答他问的，不要顺带说出后面的步骤或最终结果，除非他问的就是这个。第一行之后最多四句。"
 
     /** 给语音转写的提示，帮它认出专业词。 */
-    fun transcribeHint(subject: String, title: String) =
-        listOf(subject, title).filter { it.isNotBlank() }.joinToString("。")
+    fun transcribeHint(context: String, title: String) =
+        listOf(context, title).filter { it.isNotBlank() }.joinToString("。")
 
     private val SYSTEM_ZH = """
 你是一个学习伴侣。用户在平板上手写学习，遇到问题就用笔把它圈出来。你的价值在于"适度"：只给他此刻需要的那一点，让他自己接着想。

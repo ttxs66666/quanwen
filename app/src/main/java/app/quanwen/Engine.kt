@@ -50,9 +50,12 @@ object Engine {
         /** 笔记本里圈在页面上部时附上的上一页；用完回收。 */
         prevPage: Bitmap? = null,
         origin: String = "",
+        /** 笔记本的名字，作为上下文告诉 AI。 */
+        book: String = "",
     ): Qa {
-        val qa = store.create(prefs.subject, prefs.lang)
+        val qa = store.create("", prefs.lang)
         qa.origin = origin
+        qa.book = book
         val (circle, marks) = ImageUtil.splitMarks(strokes)   // 圈完写的 gg / j 是模式记号，不算圈
         if (screenBounds != null) qa.bounds = screenBounds
         val turn = Turn(Turn.KIND_FIRST)
@@ -130,7 +133,7 @@ object Engine {
         val notebook = qa.origin == Qa.ORIGIN_NOTE
         val content = JSONArray()
             .put(JSONObject().put("type", "input_text").put("text",
-                Prompts.firstTurnText(qa.lang, qa.subject, history, notebook, hasPrev = prev != null)))
+                Prompts.firstTurnText(qa.lang, qa.book, history, notebook, hasPrev = prev != null)))
             .put(image(page))
             .put(JSONObject().put("type", "input_text").put("text", Prompts.zoomLabel(qa.lang)))
             .put(image(crop))

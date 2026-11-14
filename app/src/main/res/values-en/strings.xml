@@ -63,8 +63,6 @@
     <string name="open_a11y">Accessibility settings</string>
     <string name="open_app_info">App info</string>
     <string name="sec_study">Study</string>
-    <string name="subject">Current subject</string>
-    <string name="subject_hint">e.g. Operations research</string>
     <string name="new_session">Start a new session</string>
     <string name="new_session_done">New session started; earlier questions will no longer be sent as context</string>
     <string name="history">History</string>
@@ -129,6 +127,12 @@
     <string name="note_move">Move pictures</string>
     <string name="note_move_hint">You can now drag pictures on the page; tap the × on a picture to delete it</string>
     <string name="note_keep">Keep</string>
+    <string name="tip_ok">Got it</string>
+    <string name="note_image">Insert picture</string>
+    <string name="note_image_gallery">From gallery</string>
+    <string name="note_image_files">From files</string>
+    <string name="note_image_added">The picture is on the page. Drag it now, or tap the × at its corner to delete it; when it\'s in place, tap Move pictures in the toolbar to go back to writing.</string>
+    <string name="tip_never">Don\'t show again</string>
     <string name="note_kept">Pinned to the page. To move it, tap Move pictures in the toolbar first.</string>
     <string name="note_keep_failed">Couldn\'t keep this answer. Drag the answer box fully on screen and try again.</string>
     <string name="note_session">Session: %1$s ▾</string>

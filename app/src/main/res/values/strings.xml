@@ -63,8 +63,6 @@
     <string name="open_a11y">打开无障碍设置</string>
     <string name="open_app_info">应用信息</string>
     <string name="sec_study">学习</string>
-    <string name="subject">当前科目</string>
-    <string name="subject_hint">比如：运筹学</string>
     <string name="new_session">开始新会话</string>
     <string name="new_session_done">已开始新会话，之后圈的题不再带上前面的问答</string>
     <string name="history">历史记录</string>
@@ -129,6 +127,12 @@
     <string name="note_move">移动图片</string>
     <string name="note_move_hint">现在可以拖动纸上的图片；点图片右上角的 × 删掉它</string>
     <string name="note_keep">留下</string>
+    <string name="tip_ok">知道了</string>
+    <string name="note_image">插入图片</string>
+    <string name="note_image_gallery">从相册选</string>
+    <string name="note_image_files">从文件选</string>
+    <string name="note_image_added">图片已贴到纸上，现在可以拖动它，点右上角的 × 删掉；摆好后点工具栏的「移动图片」回去写字。</string>
+    <string name="tip_never">不再提示</string>
     <string name="note_kept">已贴到纸上。要挪动它，先点工具栏里的「移动图片」。</string>
     <string name="note_keep_failed">没能留下这条回答，把回答框挪到屏幕里再试一次。</string>
     <string name="note_session">会话：%1$s ▾</string>

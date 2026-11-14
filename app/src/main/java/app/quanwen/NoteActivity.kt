@@ -149,7 +149,7 @@ class NoteActivity : Activity() {
         // 圈在页面上部：他可能在问上一页的东西，把上一页也给 AI
         val prev = if (pi > 0 && b.top < NotePaper.PAGE_H * PREV_PAGE_ZONE) canvas.renderPage(pi - 1, w) else null
         val qa = Engine.ask(pageBmp, px, screenBounds = null, recycleWhenDone = true,
-            marker = ImageUtil.MARK_HIGHLIGHT, prevPage = prev, origin = Qa.ORIGIN_NOTE)
+            marker = ImageUtil.MARK_HIGHLIGHT, prevPage = prev, origin = Qa.ORIGIN_NOTE, book = book.title)
         showPopup(qa, pi, b)
     }
 
@@ -249,8 +249,94 @@ class NoteActivity : Activity() {
             val y = (popupAt.y + (bodyTopInPopup - pad) / canvas.scale).coerceIn(0f, NotePaper.PAGE_H - h)
             canvas.addImage(pi, NoteImage(id, x, y, w, h))
             closePopup()
-            Toast.makeText(this, R.string.note_kept, Toast.LENGTH_LONG).show()
+            showTip("kept", R.string.note_kept)
         }, main)
+    }
+
+    // ---------- 插入图片 ----------
+
+    /** 「插入图片」：从相册选，或者从文件里选。 */
+    private fun pickImageMenu(anchor: View) {
+        val menu = PopupMenu(this, anchor)
+        menu.menu.add(0, 1, 0, R.string.note_image_gallery)
+        menu.menu.add(0, 2, 1, R.string.note_image_files)
+        menu.setOnMenuItemClickListener { item ->
+            val i = if (item.itemId == 1) {
+                if (android.os.Build.VERSION.SDK_INT >= 33) Intent(android.provider.MediaStore.ACTION_PICK_IMAGES)
+                else Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI).setType("image/*")
+            } else Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*")
+            try { startActivityForResult(i, REQ_IMAGE) }
+            catch (_: Exception) {   // 没有相册 App 之类：退回系统的通用选择器
+                try { startActivityForResult(Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*"), REQ_IMAGE) }
+                catch (_: Exception) { Toast.makeText(this, R.string.load_failed, Toast.LENGTH_SHORT).show() }
+            }
+            true
+        }
+        menu.show()
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQ_IMAGE || resultCode != RESULT_OK) return
+        val uri = data?.data ?: return
+        Thread {
+            val bmp = try { ImageUtil.decodeUri(this, uri, 2000) } catch (_: Exception) { null }
+            val id = bmp?.let { b -> try { NoteStore.saveImage(book, b, photo = true) } catch (_: Exception) { null } }
+            val w = bmp?.width ?: 0; val h = bmp?.height ?: 0
+            bmp?.recycle()
+            runOnUiThread {
+                if (id == null || w <= 0 || h <= 0) { Toast.makeText(this, R.string.load_failed, Toast.LENGTH_SHORT).show(); return@runOnUiThread }
+                placeImage(id, w, h)
+            }
+        }.start()
+    }
+
+    /** 放在当前看着的那页中间，缩到不超过页面的 60% 宽、70% 高；放好后切到「移动图片」并选中它。 */
+    private fun placeImage(id: String, pw: Int, ph: Int) {
+        val (pi, c) = canvas.viewCenterOnPage()
+        val s = min(NotePaper.PAGE_W * 0.6f / pw, NotePaper.PAGE_H * 0.7f / ph)
+        val w = pw * s; val h = ph * s
+        val img = NoteImage(id, (c.x - w / 2).coerceIn(0f, NotePaper.PAGE_W - w), (c.y - h / 2).coerceIn(0f, NotePaper.PAGE_H - h), w, h)
+        canvas.addImage(pi, img)
+        canvas.tool = NoteCanvas.Tool.MOVE
+        canvas.selectImage(pi, img)
+        showTip("image", R.string.note_image_added)
+    }
+
+    // ---------- 提示卡 ----------
+
+    private var tip: View? = null
+    private val hideTip = Runnable { tip?.let { layer.removeView(it) }; tip = null }
+
+    /**
+     * 画布顶上的一张小提示卡，不挡写字，12 秒后自己消失。
+     * 「知道了」只关这一次；「不再提示」以后都不显示（以前每次都弹 Toast，很烦）。
+     */
+    private fun showTip(key: String, text: Int) {
+        if (prefs.tipOff(key)) return
+        main.removeCallbacks(hideTip); hideTip.run()
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = rounded(0xF2222230.toInt(), dp(14f))
+            setPadding(dpi(16f), dpi(12f), dpi(8f), dpi(4f))
+            elevation = dp(8f)
+        }
+        card.addView(TextView(this).apply { this.text = getString(text); textSize = 14f; setTextColor(0xFFFFFFFF.toInt()) })
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.END }
+        row.addView(tipButton(getString(R.string.tip_never)) { prefs.turnTipOff(key); main.removeCallbacks(hideTip); hideTip.run() })
+        row.addView(tipButton(getString(R.string.tip_ok)) { main.removeCallbacks(hideTip); hideTip.run() })
+        card.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        layer.addView(card, FrameLayout.LayoutParams(min(dpi(520f), max(dpi(200f), layer.width - dpi(32f))),
+            ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = dpi(12f) })
+        tip = card
+        main.postDelayed(hideTip, 12000)
+    }
+
+    private fun tipButton(label: String, onClick: () -> Unit) = TextView(this).apply {
+        text = label; textSize = 14f; setTextColor(0xFF9CC2FF.toInt())
+        setPadding(dpi(12f), dpi(10f), dpi(12f), dpi(10f))
+        setOnClickListener { onClick() }
     }
 
     // ---------- 工具栏 ----------
@@ -286,13 +372,14 @@ class NoteActivity : Activity() {
         bar.addView(divider())
         circleBtn = icon(ToolIcon.CIRCLE) {
             if (canvas.tool == NoteCanvas.Tool.CIRCLE) canvas.tool = NoteCanvas.Tool.PEN
-            else { canvas.tool = NoteCanvas.Tool.CIRCLE; Toast.makeText(this, R.string.note_circle_hint, Toast.LENGTH_SHORT).show() }
+            else { canvas.tool = NoteCanvas.Tool.CIRCLE; showTip("circle", R.string.note_circle_hint) }
         }.apply { contentDescription = getString(R.string.note_circle) }
         moveBtn = icon(ToolIcon.MOVE) {
             if (canvas.tool == NoteCanvas.Tool.MOVE) canvas.tool = NoteCanvas.Tool.PEN
-            else { canvas.tool = NoteCanvas.Tool.MOVE; Toast.makeText(this, R.string.note_move_hint, Toast.LENGTH_SHORT).show() }
+            else { canvas.tool = NoteCanvas.Tool.MOVE; showTip("move", R.string.note_move_hint) }
         }.apply { contentDescription = getString(R.string.note_move) }
-        bar.addView(circleBtn); bar.addView(moveBtn)
+        val imageBtn = icon(ToolIcon.IMAGE) { v -> pickImageMenu(v) }.apply { contentDescription = getString(R.string.note_image) }
+        bar.addView(circleBtn); bar.addView(moveBtn); bar.addView(imageBtn)
         bar.addView(divider())
         sessionBtn = TextView(this).apply {
             textSize = 14f; setTextColor(Colors.INK); gravity = Gravity.CENTER; maxLines = 1
@@ -344,8 +431,8 @@ class NoteActivity : Activity() {
         menu.show()
     }
 
-    private fun icon(kind: Int, arg: Int = 0, onClick: () -> Unit) = ToolIcon(this, kind, arg).apply {
-        setOnClickListener { onClick() }
+    private fun icon(kind: Int, arg: Int = 0, onClick: (View) -> Unit) = ToolIcon(this, kind, arg).apply {
+        setOnClickListener { onClick(it) }
         layoutParams = LinearLayout.LayoutParams(dpi(46f), dpi(46f)).apply { marginStart = dpi(2f); marginEnd = dpi(2f) }
     }
 
@@ -360,6 +447,7 @@ class NoteActivity : Activity() {
         private const val TOOLBAR = 0xFFF8F7F4.toInt()
         /** 圈的上沿在页面上部这个比例以内时，把上一页也发给 AI。 */
         private const val PREV_PAGE_ZONE = 0.35f
+        private const val REQ_IMAGE = 7
 
         fun open(ctx: Context, id: String) =
             ctx.startActivity(Intent(ctx, NoteActivity::class.java).putExtra(EXTRA_ID, id))
@@ -503,6 +591,13 @@ class ToolIcon(ctx: Context, private val kind: Int, private val arg: Int = 0) : 
                 fill.textSize = 11f; fill.textAlign = Paint.Align.CENTER; fill.isFakeBoldText = true
                 c.drawText("?", 12f, 16f, fill)
             }
+            IMAGE -> {   // 一张画：边框、山、太阳
+                path.addRoundRect(RectF(3f, 5f, 21f, 19f), 2f, 2f, Path.Direction.CW)
+                path.moveTo(5f, 17f); path.lineTo(10f, 11f); path.lineTo(13.5f, 14.5f); path.lineTo(15.5f, 12.5f); path.lineTo(19.5f, 17f)
+                c.drawPath(path, stroke)
+                fill.color = Colors.INK
+                c.drawCircle(16f, 9f, 1.6f, fill)
+            }
             MOVE -> {   // 四向箭头
                 path.moveTo(12f, 3f); path.lineTo(12f, 21f); path.moveTo(3f, 12f); path.lineTo(21f, 12f)
                 path.moveTo(9f, 6f); path.lineTo(12f, 3f); path.lineTo(15f, 6f)
@@ -523,6 +618,7 @@ class ToolIcon(ctx: Context, private val kind: Int, private val arg: Int = 0) : 
         const val COLOR = 4
         const val CIRCLE = 5
         const val MOVE = 6
+        const val IMAGE = 7
         private val WIDTH_ICON = floatArrayOf(1.2f, 2.2f, 4f)
         private const val SELECTED_BG = 0xFFDCE5FF.toInt()
     }

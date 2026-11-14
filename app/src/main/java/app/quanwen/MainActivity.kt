@@ -25,7 +25,6 @@ class MainActivity : Activity() {
     private lateinit var floatBtn: TextView
     /** 刚去系统设置里给「显示在其他应用上层」，回来就开悬浮窗。 */
     private var wantFloat = false
-    private lateinit var subject: EditText
     private lateinit var model: EditText
     private lateinit var baseUrl: EditText
     private lateinit var apiKey: EditText
@@ -85,7 +84,6 @@ class MainActivity : Activity() {
     override fun onPause() { super.onPause(); save() }
 
     private fun save() {
-        prefs.subject = subject.text.toString()
         prefs.model = model.text.toString()
         prefs.baseUrl = baseUrl.text.toString()
         prefs.apiKey = apiKey.text.toString()
@@ -210,7 +208,6 @@ class MainActivity : Activity() {
 
         // 学习
         section(getString(R.string.sec_study))
-        subject = field(getString(R.string.subject), prefs.subject, getString(R.string.subject_hint))
         col.addView(row(
             button(getString(R.string.new_session)) {
                 Engine.init(this)

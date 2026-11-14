@@ -682,6 +682,21 @@ class NoteCanvas(
 
     fun pageCount() = pages.size
 
+    /** 屏幕中间落在哪一页，以及那一点的页面坐标（夹在纸上）。插入图片时放在这里。 */
+    fun viewCenterOnPage(): Pair<Int, PointF> {
+        val cy = scrollPos + height / 2f - topPad
+        val pi = floor(cy / (pageHpx + gap)).toInt().coerceIn(0, pages.lastIndex)
+        val p = toPage(pi, width / 2f, height / 2f)
+        return pi to PointF(p.x.coerceIn(0f, NotePaper.PAGE_W), p.y.coerceIn(0f, NotePaper.PAGE_H))
+    }
+
+    /** 选中一张图（插入后马上可以拖）。 */
+    fun selectImage(pageIndex: Int, img: NoteImage) {
+        val page = pages.getOrNull(pageIndex) ?: return
+        selected = page to img
+        invalidate()
+    }
+
     companion object {
         /** 纸张外面的底色。 */
         const val BACKDROP = 0xFFF4F3F0.toInt()

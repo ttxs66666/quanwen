@@ -380,27 +380,7 @@ class CircleActivity : Activity() {
         }.start()
     }
 
-    private fun decode(uri: Uri): Bitmap? {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-        var sample = 1
-        while (max(bounds.outWidth, bounds.outHeight) / sample > 3200) sample *= 2
-        val b = contentResolver.openInputStream(uri)?.use {
-            BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
-        } ?: return null
-        val rotation = try {
-            contentResolver.openInputStream(uri)?.use {
-                when (ExifInterface(it).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
-                    ExifInterface.ORIENTATION_ROTATE_90 -> 90f
-                    ExifInterface.ORIENTATION_ROTATE_180 -> 180f
-                    ExifInterface.ORIENTATION_ROTATE_270 -> 270f
-                    else -> 0f
-                }
-            } ?: 0f
-        } catch (_: Exception) { 0f }
-        if (rotation == 0f) return b
-        return Bitmap.createBitmap(b, 0, 0, b.width, b.height, Matrix().apply { postRotate(rotation) }, true)
-    }
+    private fun decode(uri: Uri): Bitmap? = ImageUtil.decodeUri(this, uri, 3200)
 
     // ---------- 最新截图 ----------
 

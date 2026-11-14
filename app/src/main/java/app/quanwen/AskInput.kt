@@ -246,8 +246,8 @@ class AskInputView(
         voiceState = 2
         voiceStatus.text = loc.getString(R.string.voice_working)
         val prefs = Prefs(ctx)
-        // 提示里只放科目：放题目的话，录音太轻时模型会把题目原样「认」出来
-        val hint = Prompts.transcribeHint(qa.subject, "")
+        // 提示里只放笔记本名（以前的题可能还有科目）：放题目的话，录音太轻时模型会把题目原样「认」出来
+        val hint = Prompts.transcribeHint(qa.book.ifBlank { qa.subject }, "")
         Thread {
             val text = try { VoiceRecorder.transcribe(prefs.baseUrl, prefs.apiKey, audio, hint) } catch (e: Exception) { null }
             post {

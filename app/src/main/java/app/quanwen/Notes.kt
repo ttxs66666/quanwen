@@ -175,16 +175,22 @@ object NoteStore {
 
     private fun pageFile(nb: Notebook, pageId: String) = File(File(root, nb.id), "$pageId.page")
 
-    /** 存一张贴图（PNG），返回它的 id。 */
-    fun saveImage(nb: Notebook, bmp: android.graphics.Bitmap): String {
+    /** 存一张贴图，返回它的 id。回答截图存 PNG（字清楚）；照片存 JPEG（小得多）。 */
+    fun saveImage(nb: Notebook, bmp: android.graphics.Bitmap, photo: Boolean = false): String {
         val id = newId()
-        val f = imageFile(nb, id)
+        val f = File(File(root, nb.id), if (photo) "img_$id.jpg" else "img_$id.png")
         f.parentFile?.mkdirs()
-        FileOutputStream(f).use { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        FileOutputStream(f).use {
+            if (photo) bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it)
+            else bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+        }
         return id
     }
 
-    fun imageFile(nb: Notebook, id: String) = File(File(root, nb.id), "img_$id.png")
+    fun imageFile(nb: Notebook, id: String): File {
+        val png = File(File(root, nb.id), "img_$id.png")
+        return if (png.exists()) png else File(File(root, nb.id), "img_$id.jpg")
+    }
 
     private fun newId() = UUID.randomUUID().toString().replace("-", "").take(16)
 

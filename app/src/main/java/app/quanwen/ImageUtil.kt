@@ -114,6 +114,31 @@ object ImageUtil {
         return bmp
     }
 
+    /** 打开相册、文件、拖进来的图片：大图缩到长边 maxEdge，照片按 EXIF 转正。失败返回 null。在后台线程调用。 */
+    fun decodeUri(ctx: android.content.Context, uri: android.net.Uri, maxEdge: Int): Bitmap? {
+        val cr = ctx.contentResolver
+        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        cr.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, bounds) }
+        var sample = 1
+        while (max(bounds.outWidth, bounds.outHeight) / sample > maxEdge) sample *= 2
+        val b = cr.openInputStream(uri)?.use {
+            android.graphics.BitmapFactory.decodeStream(it, null, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
+        } ?: return null
+        val rotation = try {
+            cr.openInputStream(uri)?.use {
+                when (android.media.ExifInterface(it).getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, android.media.ExifInterface.ORIENTATION_NORMAL)) {
+                    android.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                    android.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                    android.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                    else -> 0f
+                }
+            } ?: 0f
+        } catch (_: Exception) { 0f }
+        if (rotation == 0f) return b
+        return Bitmap.createBitmap(b, 0, 0, b.width, b.height, android.graphics.Matrix().apply { postRotate(rotation) }, true)
+            .also { if (it !== b) b.recycle() }
+    }
+
     const val MARK_MAX = 360
     const val MARK_RED = 0
     const val MARK_HIGHLIGHT = 1

@@ -57,6 +57,8 @@ class Qa(
     val turns: MutableList<Turn> = mutableListOf(),
     /** 从哪里圈的：空 = 截屏（悬浮条、App 内圈题），[ORIGIN_NOTE] = 自带笔记本。 */
     var origin: String = "",
+    /** 在笔记本里圈的：笔记本的名字（比如「偏微分方程」）。 */
+    var book: String = "",
 ) {
     val busy: Boolean get() = turns.any { it.state == Turn.STATE_LOADING || it.state == Turn.STATE_STREAMING }
 
@@ -68,7 +70,7 @@ class Qa(
         val b = JSONArray(); bounds.forEach { b.put(it.toDouble()) }
         return JSONObject().put("id", id).put("sessionId", sessionId).put("subject", subject)
             .put("time", time).put("lang", lang).put("type", type).put("title", title)
-            .put("bounds", b).put("turns", arr).put("origin", origin)
+            .put("bounds", b).put("turns", arr).put("origin", origin).put("book", book)
     }
 
     companion object {
@@ -87,6 +89,7 @@ class Qa(
             o.optJSONArray("bounds")?.let { b -> if (b.length() == 4) qa.bounds = FloatArray(4) { b.optDouble(it).toFloat() } }
             o.optJSONArray("turns")?.let { arr -> for (i in 0 until arr.length()) qa.turns.add(Turn.fromJson(arr.getJSONObject(i))) }
             qa.origin = o.optString("origin")
+            qa.book = o.optString("book")
             return qa
         }
     }

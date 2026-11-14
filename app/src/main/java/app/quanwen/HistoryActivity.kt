@@ -86,7 +86,7 @@ class HistoryActivity : Activity() {
                 background = rounded(Colors.forType(qa.type), dp(9f))
             })
             head.addView(TextView(this@HistoryActivity).apply {
-                text = listOf(qa.subject, fmt.format(Date(qa.time))).filter { it.isNotBlank() }.joinToString(" · ")
+                text = listOf(qa.book.ifBlank { qa.subject }, fmt.format(Date(qa.time))).filter { it.isNotBlank() }.joinToString(" · ")
                 textSize = 12f; setTextColor(Colors.MUTED); setPadding(dpi(8f), 0, 0, 0)
             })
             box.addView(head)
@@ -138,7 +138,7 @@ class DetailActivity : Activity() {
                         .put("state", if (t.state == Turn.STATE_ERROR) "error" else "done")
                         .put("error", t.error ?: ""))
                 }
-                val meta = listOf(qa.type, qa.subject, fmt.format(Date(qa.time)), plainMath(qa.title)).filter { it.isNotBlank() }.joinToString(" · ")
+                val meta = listOf(qa.type, qa.book.ifBlank { qa.subject }, fmt.format(Date(qa.time)), plainMath(qa.title)).filter { it.isNotBlank() }.joinToString(" · ")
                 val payload = JSONObject().put("turns", turns).put("meta", meta)
                     .put("s", JSONObject().put("loading", "").put("retry", ""))
                 if (crop != null) payload.put("image", "data:image/jpeg;base64," + Base64.encodeToString(crop, Base64.NO_WRAP))

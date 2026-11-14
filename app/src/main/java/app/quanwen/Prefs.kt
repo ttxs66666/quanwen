@@ -12,9 +12,10 @@ class Prefs(context: Context) {
         get() = sp.getString("lang", "zh") ?: "zh"
         set(v) = sp.edit().putString("lang", v).apply()
 
-    var subject: String
-        get() = sp.getString("subject", "") ?: ""
-        set(v) = sp.edit().putString("subject", v.trim()).apply()
+    init {
+        // 第 15 版去掉了全局的「当前科目」：它会被带进每一道题（新会话、别的笔记本也一样），限制了会话管理
+        if (sp.contains("subject")) sp.edit().remove("subject").apply()
+    }
 
     var model: String
         get() = (sp.getString("model", null) ?: "").ifBlank { DEFAULT_MODEL }
@@ -66,6 +67,15 @@ class Prefs(context: Context) {
     var floatMode: Boolean
         get() = sp.getBoolean("floatMode", false)
         set(v) = sp.edit().putBoolean("floatMode", v).apply()
+
+    /** 点过「不再提示」的提示（笔记本里的圈、移动图片、留下）。 */
+    fun tipOff(key: String): Boolean = sp.getStringSet("tipsOff", emptySet())?.contains(key) == true
+
+    fun turnTipOff(key: String) {
+        val s = HashSet(sp.getStringSet("tipsOff", emptySet()) ?: emptySet())
+        s.add(key)
+        sp.edit().putStringSet("tipsOff", s).apply()
+    }
 
     /** 笔记本里上次用的笔：颜色和粗细的档位（0..2）。 */
     var noteColor: Int
