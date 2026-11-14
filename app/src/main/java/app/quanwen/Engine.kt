@@ -53,6 +53,7 @@ object Engine {
     ): Qa {
         val qa = store.create(prefs.subject, prefs.lang)
         qa.origin = origin
+        val (circle, marks) = ImageUtil.splitMarks(strokes)   // 圈完写的 gg / j 是模式记号，不算圈
         if (screenBounds != null) qa.bounds = screenBounds
         val turn = Turn(Turn.KIND_FIRST)
         qa.turns.add(turn)
@@ -61,14 +62,15 @@ object Engine {
         notify(qa, false)
         io.execute {
             try {
-                val (page, crop) = ImageUtil.prepare(image, strokes, marker)
+                val (page, crop) = ImageUtil.prepare(image, circle, marker)
                 if (recycleWhenDone) image.recycle()
+                val mark = if (marks.isEmpty()) null else ImageUtil.renderMarks(marks).let { m -> ImageUtil.jpeg(m).also { m.recycle() } }
                 val prev = prevPage?.let { p ->
                     val s = ImageUtil.scaleToMax(p, ImageUtil.PAGE_MAX)
                     ImageUtil.jpeg(s).also { if (s !== p) s.recycle(); p.recycle() }
                 }
-                store.saveImages(qa, page, crop, prev)
-                runFirst(qa, turn, page, crop, prev, history)
+                store.saveImages(qa, page, crop, prev, mark)
+                runFirst(qa, turn, page, crop, prev, mark, history)
             } catch (e: Exception) {
                 main.post { fail(qa, turn, e.toString()) }
             }
@@ -113,7 +115,8 @@ object Engine {
             io.execute {
                 try {
                     val prev = store.prevFile(qa).takeIf { it.exists() }?.readBytes()
-                    runFirst(qa, turn, store.pageFile(qa).readBytes(), store.cropFile(qa).readBytes(), prev, history)
+                    val mark = store.markFile(qa).takeIf { it.exists() }?.readBytes()
+                    runFirst(qa, turn, store.pageFile(qa).readBytes(), store.cropFile(qa).readBytes(), prev, mark, history)
                 } catch (e: Exception) { main.post { fail(qa, turn, e.toString()) } }
             }
         } else {
@@ -123,7 +126,7 @@ object Engine {
     }
 
     /** 后台线程。 */
-    private fun runFirst(qa: Qa, turn: Turn, page: ByteArray, crop: ByteArray, prev: ByteArray?, history: String) {
+    private fun runFirst(qa: Qa, turn: Turn, page: ByteArray, crop: ByteArray, prev: ByteArray?, mark: ByteArray?, history: String) {
         val notebook = qa.origin == Qa.ORIGIN_NOTE
         val content = JSONArray()
             .put(JSONObject().put("type", "input_text").put("text",
@@ -134,6 +137,9 @@ object Engine {
         if (prev != null) content
             .put(JSONObject().put("type", "input_text").put("text", Prompts.prevPageLabel(qa.lang)))
             .put(image(prev))
+        if (mark != null) content   // 根源模式（gg）/ 解题模式（j）
+            .put(JSONObject().put("type", "input_text").put("text", Prompts.markText(qa.lang)))
+            .put(image(mark))
         val body = baseBody(qa.lang)
             .put("input", JSONArray().put(JSONObject().put("role", "user").put("content", content)))
         streamInto(qa, turn, body)

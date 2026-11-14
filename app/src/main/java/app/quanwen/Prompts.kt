@@ -41,6 +41,23 @@ object Prompts {
 
     fun prevPageLabel(lang: String) = if (lang == "en") "Previous page:" else "上一页："
 
+    /** 圈完写了模式记号：gg 根源模式，j 解题模式。最后一张图只有记号。 */
+    fun markText(lang: String) = if (lang == "en") MARK_EN else MARK_ZH
+
+    private val MARK_ZH = """
+他圈完以后在旁边写了一个模式记号（下面这张图里只有这个记号）：
+- gg：根源模式。从这个知识最根本的地方讲起：它要解决什么问题、建立在哪些更基本的概念上、为什么会是这样，一层层讲回到他圈的内容。重在讲清思想和来龙去脉，不堆细节，正文不超过 10 句（公式另算）。类型行写「根源」。
+- j：解题模式。把这道题完整解出来并讲懂：先用一句话说思路，再用编号步骤解，关键步骤说明为什么这样做，最后写出答案。类型行写「解题」。
+这两种模式是他主动要的，不受「适度」的限制。认不出记号，或者写的不是这两个，就按普通方式回答。
+""".trim()
+
+    private val MARK_EN = """
+After circling, they wrote a mode mark next to the circle (the image below shows only the mark):
+- gg: Roots mode. Start from the deepest root of this knowledge: what problem it solves, which more basic ideas it rests on, why it is the way it is, and work back up to what they circled. Focus on the idea and where it comes from, not on details; at most 10 sentences of body text (formulas aside). Write "Roots" on the Type line.
+- j: Solve mode. Solve the problem completely and make it understood: one sentence on the approach, then numbered steps, saying why at the key steps, and finally the answer. Write "Solve" on the Type line.
+They asked for these modes on purpose, so the restraint rule does not apply. If you cannot read the mark, or it is neither of these, answer the normal way.
+""".trim()
+
 
     fun zoomLabel(lang: String) = if (lang == "en") "Zoomed view of the circled area:" else "圈内放大图："
 
@@ -82,7 +99,7 @@ object Prompts {
 - 用中文回答。
 
 第一次回答一道圈出的题时，严格按这个格式输出：
-类型：提问 / 判断 / 推一步（三选一）
+类型：提问 / 判断 / 推一步（三选一；他写了模式记号时按记号写「根源」或「解题」）
 题目：用一句话转写圈内的问题或思路，不超过 40 字，纯文字，不用 LaTeX
 ---
 回答正文
@@ -110,7 +127,7 @@ Rules:
 - Answer in English.
 
 For the first answer to a circled question, output exactly this format:
-Type: Question / Check / Nudge (pick one)
+Type: Question / Check / Nudge (pick one; if they wrote a mode mark, write Roots or Solve as the mark says)
 Topic: one-line transcription of the circled question or idea, at most 15 words, plain text without LaTeX
 ---
 answer body

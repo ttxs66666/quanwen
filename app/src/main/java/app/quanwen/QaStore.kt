@@ -166,10 +166,11 @@ class QaStore(context: Context) {
         try { File(dir, "${qa.id}.json").writeText(qa.toJson().toString()) } catch (_: Exception) { }
     }
 
-    fun saveImages(qa: Qa, page: ByteArray, crop: ByteArray, prev: ByteArray? = null) {
+    fun saveImages(qa: Qa, page: ByteArray, crop: ByteArray, prev: ByteArray? = null, mark: ByteArray? = null) {
         File(dir, "${qa.id}_page.jpg").writeBytes(page)
         File(dir, "${qa.id}_crop.jpg").writeBytes(crop)
         if (prev != null) prevFile(qa).writeBytes(prev)
+        if (mark != null) markFile(qa).writeBytes(mark)
     }
 
     /** 手写追问的字迹图。 */
@@ -183,10 +184,12 @@ class QaStore(context: Context) {
     fun cropFile(qa: Qa) = File(dir, "${qa.id}_crop.jpg")
     /** 笔记本里圈在页面上部时，一起发给模型的上一页。 */
     fun prevFile(qa: Qa) = File(dir, "${qa.id}_prev.jpg")
+    /** 圈完写的模式记号（gg、j）单独画成的小图。 */
+    fun markFile(qa: Qa) = File(dir, "${qa.id}_mark.jpg")
 
     fun delete(qa: Qa) {
         list.remove(qa)
-        File(dir, "${qa.id}.json").delete(); pageFile(qa).delete(); cropFile(qa).delete(); prevFile(qa).delete()
+        File(dir, "${qa.id}.json").delete(); pageFile(qa).delete(); cropFile(qa).delete(); prevFile(qa).delete(); markFile(qa).delete()
         qa.turns.forEach { t -> if (t.imagePath.isNotBlank()) File(t.imagePath).delete() }
     }
 

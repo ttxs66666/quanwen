@@ -115,21 +115,24 @@ class DetailActivity : Activity() {
         val web = WebView(this).apply { setBackgroundColor(Colors.PAPER); settings.javaScriptEnabled = true }
         setContentView(web)
         val crop = store.cropFile(qa).takeIf { it.exists() }?.readBytes()
+        val mark = store.markFile(qa).takeIf { it.exists() }?.readBytes()   // 圈完写的 gg / j
         val fmt = SimpleDateFormat("yyyy-M-d HH:mm", Locale.getDefault())
         web.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 val turns = JSONArray()
-                qa.turns.forEach { t ->
+                qa.turns.forEachIndexed { i, t ->
+                    val showMark = i == 0 && mark != null
                     turns.put(JSONObject()
                         .put("label", when (t.kind) {
                             Turn.KIND_MORE -> getString(R.string.label_more)
                             Turn.KIND_REVEAL -> getString(R.string.label_reveal)
                             Turn.KIND_ASK -> if (t.imagePath.isNotBlank() && t.question.isBlank()) getString(R.string.label_ask_hand)
                                              else getString(R.string.label_ask) + t.question
-                            else -> ""
+                            else -> if (showMark) getString(R.string.label_mark) else ""
                         })
                         .put("text", t.text)
-                        .put("image", if (t.imagePath.isNotBlank()) try {
+                        .put("image", if (showMark) "data:image/jpeg;base64," + Base64.encodeToString(mark, Base64.NO_WRAP)
+                                      else if (t.imagePath.isNotBlank()) try {
                             "data:image/jpeg;base64," + Base64.encodeToString(java.io.File(t.imagePath).readBytes(), Base64.NO_WRAP)
                         } catch (_: Exception) { "" } else "")
                         .put("state", if (t.state == Turn.STATE_ERROR) "error" else "done")

@@ -4,7 +4,7 @@
     <string name="service_desc">Shows the circle/card float bar. The screen is captured only when you tap the circle button, so you can circle a question and send it to the AI.</string>
 
     <string name="lasso_hint">Circle your question</string>
-    <string name="lasso_sending">Sends when you pause; keep drawing to extend the circle</string>
+    <string name="lasso_sending">Sends after a 1-second pause; keep drawing to extend the circle, or write gg for roots or j to solve</string>
     <string name="lasso_redo">Redo</string>
     <string name="lasso_cancel">Cancel</string>
 
@@ -23,6 +23,7 @@
     <string name="ask_cancel">Cancel</string>
     <string name="ask_type_hint">Type your question…</string>
     <string name="label_ask_hand">You asked (handwritten):</string>
+    <string name="label_mark">Mode mark written after circling:</string>
     <string name="voice_listening">● Listening, tap when done</string>
     <string name="pad_empty">Write something on the pad first</string>
     <string name="type_empty">Type your question first</string>
@@ -81,7 +82,7 @@
     <string name="src_latest">Latest screenshot</string>
     <string name="src_pick">Gallery</string>
     <string name="src_camera">Camera</string>
-    <string name="circle_hint">Circle your question; pinch to zoom. New screenshots load automatically.</string>
+    <string name="circle_hint">Circle your question, then write gg for roots or j to solve if you like; pinch to zoom. New screenshots load automatically.</string>
     <string name="circle_empty">Load an image with the buttons above (latest screenshot, screenshot — temporary, never saved to the gallery — gallery or paste), or drag a screenshot here.</string>
     <string name="latest_loaded">Loaded the latest screenshot</string>
     <string name="no_screenshot">No screenshot found</string>
@@ -124,7 +125,7 @@
     <string name="note_undo">Undo</string>
     <string name="note_redo">Redo</string>
     <string name="note_circle">Circle to ask AI</string>
-    <string name="note_circle_hint">Circle the question with the highlighter; it goes to the AI when you pause for 1 second</string>
+    <string name="note_circle_hint">Circle the question with the highlighter; it goes to the AI when you pause for 1 second. Write gg after circling for roots, or j to solve</string>
     <string name="note_move">Move pictures</string>
     <string name="note_move_hint">You can now drag pictures on the page; tap the × on a picture to delete it</string>
     <string name="note_keep">Keep</string>

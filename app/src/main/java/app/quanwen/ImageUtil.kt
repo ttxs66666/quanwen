@@ -78,6 +78,43 @@ object ImageUtil {
         return out.toByteArray()
     }
 
+    /**
+     * 把圈和圈完写的模式记号（gg、j）分开：第一笔是圈；之后的笔画比圈小得多（最长边不到第一笔的 40%）
+     * 就算记号，否则算补圈（有人分两笔画圈）。
+     */
+    fun splitMarks(strokes: List<FloatArray>): Pair<List<FloatArray>, List<FloatArray>> {
+        if (strokes.size < 2) return strokes to emptyList()
+        val first = bounds(listOf(strokes[0]))
+        val size0 = max(first.width(), first.height())
+        val circle = mutableListOf(strokes[0])
+        val marks = mutableListOf<FloatArray>()
+        for (s in strokes.drop(1)) {
+            val b = bounds(listOf(s))
+            if (max(b.width(), b.height()) < size0 * 0.4f) marks.add(s) else circle.add(s)
+        }
+        return circle to marks
+    }
+
+    /** 把记号单独画成一张白底黑字的小图（最长边约 [MARK_MAX]），发给模型认。 */
+    fun renderMarks(marks: List<FloatArray>): Bitmap {
+        val b = bounds(marks)
+        val side = max(1f, max(b.width(), b.height()))
+        val k = MARK_MAX * 0.8f / side
+        val pad = MARK_MAX * 0.1f
+        val bmp = Bitmap.createBitmap((b.width() * k + 2 * pad).roundToInt().coerceAtLeast(16),
+            (b.height() * k + 2 * pad).roundToInt().coerceAtLeast(16), Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+        c.drawColor(0xFFFFFFFF.toInt())
+        c.translate(pad - b.left * k, pad - b.top * k)
+        c.scale(k, k)
+        c.drawPath(strokesPath(marks), Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xFF000000.toInt(); style = Paint.Style.STROKE
+            strokeWidth = MARK_MAX / 45f / k; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
+        })
+        return bmp
+    }
+
+    const val MARK_MAX = 360
     const val MARK_RED = 0
     const val MARK_HIGHLIGHT = 1
     const val PAGE_MAX = 1600

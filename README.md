@@ -31,6 +31,7 @@
   - ⌨ 打字：在输入框里打字。
 - 回答卡片可以拖动，能显示 LaTeX 公式，能翻看这次学习里的其他回答。
 - **会话**：回答面板右上角的 ☰ 可以新建会话、切换会话。新圈的题只进当前会话，AI 也只参考当前会话里前面的问答，复习一门、再学另一门，互不干扰。
+- **模式记号**（第 14 版起）：圈完停 1 秒什么都不写是普通模式；圈完在旁边写 **gg** 是根源模式（从知识的根上讲起），写 **j** 是解题模式（直接把题解了、讲懂）。悬浮条、App 内圈题、笔记本都能用。
 - **App 内圈题**：不用悬浮条，开不了无障碍的系统（比如鸿蒙的卓易通）也能用。
 - **自带笔记本**（第 12 版起）：书架上新建笔记本、选封面；米黄色横向纸张，黑红蓝三色、三档粗细，一笔一撤，每 3 秒自动保存。用过触控笔以后只有笔能写，手指用来滚动。
   - 第 13 版起可以在笔记本里直接圈题：点工具栏的「圈」，用荧光笔圈出问题，停笔 1 秒就发给 AI；荧光圈会自己淡掉。回答框出现在圈的附近、比较空的地方，避开右手放的位置，可以拖标题栏挪开。追问就是在纸上接着写、再圈。点「留下」把回答变成一张图贴在纸上；工具栏里打开「移动图片」才能拖动或删除这些图，免得写字时误碰。会话在工具栏右边的下拉菜单里切换。
@@ -102,6 +103,7 @@ The point: you ask the questions and do the reasoning; the AI only nudges you wh
   - ⌨ Type: type it in a text box.
 - The answer card is draggable, renders LaTeX, and lets you page through the other answers from the session.
 - **Sessions**: the ☰ button at the top right of the answer panel creates or switches sessions. New questions go into the current session, and the AI only builds on earlier questions from that session, so reviewing one subject and then studying another don't mix.
+- **Mode marks** (from version 14): pause for 1 second after circling for the normal mode; write **gg** next to the circle for Roots mode (explains the idea from its roots), or **j** for Solve mode (solves the problem and explains it). Works with the float bar, circling in the app, and notebooks.
 - **Circle in the app**: no float bar needed, so it also works where accessibility can't be turned on (for example HarmonyOS with Zhuoyitong).
 - **Built-in notebooks** (from version 12): create notebooks on a bookshelf and pick a cover. Cream landscape paper, black/red/blue pens in three widths, one-stroke undo, auto-save every 3 seconds. Once you've used a stylus, only the stylus writes and fingers scroll.
   - From version 13 you can circle questions right in the notebook: tap the circle tool in the toolbar, loop the question with the highlighter, and it goes to the AI when you pause for 1 second; the highlight fades by itself. The answer box appears next to the circle in an emptier spot, away from where your right hand rests, and you can drag it by its title bar. To follow up, keep writing on the page and circle again. Tap Keep to pin the answer to the page as a picture; turn on Move pictures in the toolbar to drag or delete pictures, so you don't move them by accident while writing. Switch sessions from the dropdown at the right of the toolbar.

@@ -159,7 +159,7 @@ class LassoOverlay(
                         add(s, e.x, e.y)
                         val arr = s.toFloatArray()
                         val b = ImageUtil.bounds(listOf(arr))
-                        if (max(b.width(), b.height()) * scale >= svc.dp(24f)) strokes.add(arr)  // 太小的当作误触
+                        if (max(b.width(), b.height()) * scale >= svc.dp(4f)) strokes.add(arr)  // 只扔掉极小的误触；小笔画可能是模式记号
                     }
                     current = null
                     if (strokes.isNotEmpty()) {
@@ -180,6 +180,6 @@ class LassoOverlay(
     }
 
     companion object {
-        const val SEND_DELAY_MS = 700L
+        const val SEND_DELAY_MS = 1000L   // 停 1 秒什么都不写就是普通模式；接着写 gg / j 是别的模式
     }
 }

@@ -140,7 +140,7 @@ class ImageLassoView(context: Context, private val onDone: (List<FloatArray>) ->
                     add(s, e.x, e.y)
                     val arr = s.toFloatArray()
                     val r = ImageUtil.bounds(listOf(arr))
-                    if (max(r.width(), r.height()) * scale() >= context.dp(24f)) strokes.add(arr)   // 太小的当作误触
+                    if (max(r.width(), r.height()) * scale() >= context.dp(4f)) strokes.add(arr)   // 只扔掉极小的误触；小笔画可能是模式记号
                     if (strokes.isNotEmpty()) postDelayed(sendNow, SEND_DELAY_MS)
                 }
                 current = null; mode = Mode.NONE
@@ -177,6 +177,6 @@ class ImageLassoView(context: Context, private val onDone: (List<FloatArray>) ->
     private fun midY(e: MotionEvent) = (e.getY(0) + e.getY(1)) / 2f
 
     companion object {
-        const val SEND_DELAY_MS = 700L
+        const val SEND_DELAY_MS = 1000L   // 停 1 秒什么都不写就是普通模式；接着写 gg / j 是别的模式
     }
 }

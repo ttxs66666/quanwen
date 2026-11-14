@@ -4,7 +4,7 @@
     <string name="service_desc">显示「圈」「卡」悬浮条。只有在你点「圈」时才截取屏幕，让你圈出问题发给 AI。</string>
 
     <string name="lasso_hint">圈出你的问题</string>
-    <string name="lasso_sending">停笔就发送，接着画可以补圈</string>
+    <string name="lasso_sending">停笔 1 秒就发送；接着画可以补圈，圈完写 gg 讲根源、写 j 解题</string>
     <string name="lasso_redo">重圈</string>
     <string name="lasso_cancel">取消</string>
 
@@ -23,6 +23,7 @@
     <string name="ask_cancel">取消</string>
     <string name="ask_type_hint">输入你的追问…</string>
     <string name="label_ask_hand">追问（手写）：</string>
+    <string name="label_mark">圈完写的模式记号：</string>
     <string name="voice_listening">● 正在听，说完点这里</string>
     <string name="pad_empty">先在书写板上写点什么</string>
     <string name="type_empty">先输入你的追问</string>
@@ -81,7 +82,7 @@
     <string name="src_latest">最新截图</string>
     <string name="src_pick">相册</string>
     <string name="src_camera">拍照</string>
-    <string name="circle_hint">圈出你的问题；双指可以缩放。截了新图会自动换上。</string>
+    <string name="circle_hint">圈出你的问题，圈完写 gg 讲根源、写 j 解题；双指可以缩放。截了新图会自动换上。</string>
     <string name="circle_empty">点上面的按钮载入一张图：最新截图、截屏（只临时用，不存相册）、相册或粘贴；也可以把截图直接拖到这里。</string>
     <string name="latest_loaded">已载入最新截图</string>
     <string name="no_screenshot">没找到截图</string>
@@ -124,7 +125,7 @@
     <string name="note_undo">撤回</string>
     <string name="note_redo">还原</string>
     <string name="note_circle">圈题问 AI</string>
-    <string name="note_circle_hint">用荧光笔圈出问题，停笔 1 秒就发给 AI</string>
+    <string name="note_circle_hint">用荧光笔圈出问题，停笔 1 秒就发给 AI；圈完写 gg 讲根源、写 j 解题</string>
     <string name="note_move">移动图片</string>
     <string name="note_move_hint">现在可以拖动纸上的图片；点图片右上角的 × 删掉它</string>
     <string name="note_keep">留下</string>

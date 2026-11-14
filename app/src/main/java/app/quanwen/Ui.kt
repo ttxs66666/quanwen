@@ -21,6 +21,8 @@ object Colors {
         type.contains("判断") || type.contains("Check", true) -> 0xFF2E7D4F.toInt()
         type.contains("推") || type.contains("Nudge", true) -> 0xFFB7791F.toInt()
         type.contains("揭晓") || type.contains("Reveal", true) -> 0xFF6B4FA0.toInt()
+        type.contains("根源") || type.contains("Root", true) -> 0xFF8A4F7D.toInt()
+        type.contains("解题") || type.contains("Solve", true) -> 0xFF1F7A8C.toInt()
         type.isBlank() -> MUTED
         else -> 0xFF2F5D9E.toInt()
     }
