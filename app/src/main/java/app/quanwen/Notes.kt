@@ -38,8 +38,14 @@ object NotePaper {
 /** 一笔：颜色、粗细（页面坐标）和点（x0,y0,x1,y1,…，页面坐标）。画完就不再改。 */
 class Stroke(val color: Int, val width: Float, val pts: FloatArray)
 
+/** 贴在页上的图片（比如「留下」的 AI 回答）：文件名和位置大小（页面坐标）。 */
+class NoteImage(val id: String, var x: Float, var y: Float, val w: Float, val h: Float) {
+    fun contains(px: Float, py: Float) = px >= x && px <= x + w && py >= y && py <= y + h
+}
+
 class NotePage(val id: String) {
     val strokes = ArrayList<Stroke>()
+    val images = ArrayList<NoteImage>()
     /** 每改一次加一，画面缓存靠它判断要不要重画。 */
     var version = 0
     var dirty = false
@@ -115,7 +121,8 @@ object NoteStore {
         if (!f.exists()) return page
         try {
             DataInputStream(BufferedInputStream(FileInputStream(f))).use { inp ->
-                if (inp.readInt() != MAGIC) return page
+                val magic = inp.readInt()
+                if (magic != MAGIC && magic != MAGIC2) return page
                 val n = inp.readInt()
                 repeat(n) {
                     val color = inp.readInt()
@@ -125,18 +132,21 @@ object NoteStore {
                     for (i in 0 until count) pts[i] = inp.readFloat()
                     page.strokes.add(Stroke(color, width, pts))
                 }
+                if (magic == MAGIC2) repeat(inp.readInt()) {
+                    page.images.add(NoteImage(inp.readUTF(), inp.readFloat(), inp.readFloat(), inp.readFloat(), inp.readFloat()))
+                }
             }
         } catch (_: Exception) { }
         return page
     }
 
     /** 在后台线程调用；strokes 是调用方拍下的快照。先写临时文件再改名，写到一半断电也不会坏。 */
-    fun writePage(nb: Notebook, pageId: String, strokes: List<Stroke>) {
+    fun writePage(nb: Notebook, pageId: String, strokes: List<Stroke>, images: List<NoteImage>) {
         val f = pageFile(nb, pageId)
         f.parentFile?.mkdirs()
         val tmp = File(f.parentFile, f.name + ".tmp")
         DataOutputStream(BufferedOutputStream(FileOutputStream(tmp))).use { out ->
-            out.writeInt(MAGIC)
+            out.writeInt(MAGIC2)
             out.writeInt(strokes.size)
             for (s in strokes) {
                 out.writeInt(s.color)
@@ -144,6 +154,8 @@ object NoteStore {
                 out.writeInt(s.pts.size)
                 for (v in s.pts) out.writeFloat(v)
             }
+            out.writeInt(images.size)
+            for (im in images) { out.writeUTF(im.id); out.writeFloat(im.x); out.writeFloat(im.y); out.writeFloat(im.w); out.writeFloat(im.h) }
         }
         if (!tmp.renameTo(f)) { f.delete(); tmp.renameTo(f) }
     }
@@ -163,7 +175,19 @@ object NoteStore {
 
     private fun pageFile(nb: Notebook, pageId: String) = File(File(root, nb.id), "$pageId.page")
 
+    /** 存一张贴图（PNG），返回它的 id。 */
+    fun saveImage(nb: Notebook, bmp: android.graphics.Bitmap): String {
+        val id = newId()
+        val f = imageFile(nb, id)
+        f.parentFile?.mkdirs()
+        FileOutputStream(f).use { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        return id
+    }
+
+    fun imageFile(nb: Notebook, id: String) = File(File(root, nb.id), "img_$id.png")
+
     private fun newId() = UUID.randomUUID().toString().replace("-", "").take(16)
 
-    private const val MAGIC = 0x51575031   // "QWP1"
+    private const val MAGIC = 0x51575031    // "QWP1"：只有笔迹
+    private const val MAGIC2 = 0x51575032   // "QWP2"：笔迹 + 贴图
 }

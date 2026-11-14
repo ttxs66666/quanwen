@@ -123,6 +123,14 @@
     <string name="shelf_delete_confirm">删除「%1$s」？里面的笔记会一起删掉，删了不能恢复。</string>
     <string name="note_undo">撤回</string>
     <string name="note_redo">还原</string>
+    <string name="note_circle">圈题问 AI</string>
+    <string name="note_circle_hint">用荧光笔圈出问题，停笔 1 秒就发给 AI</string>
+    <string name="note_move">移动图片</string>
+    <string name="note_move_hint">现在可以拖动纸上的图片；点图片右上角的 × 删掉它</string>
+    <string name="note_keep">留下</string>
+    <string name="note_kept">已贴到纸上。要挪动它，先点工具栏里的「移动图片」。</string>
+    <string name="note_keep_failed">没能留下这条回答，把回答框挪到屏幕里再试一次。</string>
+    <string name="note_session">会话：%1$s ▾</string>
 
     <string name="sec_update">更新</string>
     <string name="version_now">当前版本 %1$s（第 %2$d 版）</string>

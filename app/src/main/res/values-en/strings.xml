@@ -123,6 +123,14 @@
     <string name="shelf_delete_confirm">Delete \"%1$s\"? All its pages are deleted too and can\'t be recovered.</string>
     <string name="note_undo">Undo</string>
     <string name="note_redo">Redo</string>
+    <string name="note_circle">Circle to ask AI</string>
+    <string name="note_circle_hint">Circle the question with the highlighter; it goes to the AI when you pause for 1 second</string>
+    <string name="note_move">Move pictures</string>
+    <string name="note_move_hint">You can now drag pictures on the page; tap the × on a picture to delete it</string>
+    <string name="note_keep">Keep</string>
+    <string name="note_kept">Pinned to the page. To move it, tap Move pictures in the toolbar first.</string>
+    <string name="note_keep_failed">Couldn\'t keep this answer. Drag the answer box fully on screen and try again.</string>
+    <string name="note_session">Session: %1$s ▾</string>
 
     <string name="sec_update">Updates</string>
     <string name="version_now">Version %1$s (build %2$d)</string>

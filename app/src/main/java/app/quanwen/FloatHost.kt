@@ -114,6 +114,17 @@ class FloatHost(base: Context, val windowType: Int, private val source: ScreenSo
 
     fun barRect() = bar?.rect()
 
+    /**
+     * 打开圈问自带笔记本时把悬浮条和卡片收起来（笔记本有自己的「圈」），离开时再放出来。
+     */
+    fun setSuspended(on: Boolean) {
+        if (on == suspended) return
+        suspended = on
+        if (on) { bar?.hide(); card?.hideForCapture() }
+        else if (!capturing && lasso == null) { bar?.show(); card?.restoreAfterCapture() }
+    }
+    private var suspended = false
+
     /** 设置页改了语言之后调用。 */
     fun refreshLabels() = card?.applyStrings()
 

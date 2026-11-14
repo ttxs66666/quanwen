@@ -43,8 +43,16 @@ object Engine {
      * 圈了一道题。image 是截图或照片，strokes 是笔迹（图片像素坐标）。
      * screenBounds 是圈在屏幕上的位置，悬浮条模式用它把卡片摆在圈旁边；App 内圈题传 null。
      */
-    fun ask(image: Bitmap, strokes: List<FloatArray>, screenBounds: FloatArray?, recycleWhenDone: Boolean): Qa {
+    fun ask(
+        image: Bitmap, strokes: List<FloatArray>, screenBounds: FloatArray?, recycleWhenDone: Boolean,
+        /** 发给模型的整页上怎么标出圈：红线（截屏）或橙色荧光（笔记本）。 */
+        marker: Int = ImageUtil.MARK_RED,
+        /** 笔记本里圈在页面上部时附上的上一页；用完回收。 */
+        prevPage: Bitmap? = null,
+        origin: String = "",
+    ): Qa {
         val qa = store.create(prefs.subject, prefs.lang)
+        qa.origin = origin
         if (screenBounds != null) qa.bounds = screenBounds
         val turn = Turn(Turn.KIND_FIRST)
         qa.turns.add(turn)
@@ -53,10 +61,14 @@ object Engine {
         notify(qa, false)
         io.execute {
             try {
-                val (page, crop) = ImageUtil.prepare(image, strokes)
+                val (page, crop) = ImageUtil.prepare(image, strokes, marker)
                 if (recycleWhenDone) image.recycle()
-                store.saveImages(qa, page, crop)
-                runFirst(qa, turn, page, crop, history)
+                val prev = prevPage?.let { p ->
+                    val s = ImageUtil.scaleToMax(p, ImageUtil.PAGE_MAX)
+                    ImageUtil.jpeg(s).also { if (s !== p) s.recycle(); p.recycle() }
+                }
+                store.saveImages(qa, page, crop, prev)
+                runFirst(qa, turn, page, crop, prev, history)
             } catch (e: Exception) {
                 main.post { fail(qa, turn, e.toString()) }
             }
@@ -100,7 +112,8 @@ object Engine {
             val history = store.historyText(qa)
             io.execute {
                 try {
-                    runFirst(qa, turn, store.pageFile(qa).readBytes(), store.cropFile(qa).readBytes(), history)
+                    val prev = store.prevFile(qa).takeIf { it.exists() }?.readBytes()
+                    runFirst(qa, turn, store.pageFile(qa).readBytes(), store.cropFile(qa).readBytes(), prev, history)
                 } catch (e: Exception) { main.post { fail(qa, turn, e.toString()) } }
             }
         } else {
@@ -110,12 +123,17 @@ object Engine {
     }
 
     /** 后台线程。 */
-    private fun runFirst(qa: Qa, turn: Turn, page: ByteArray, crop: ByteArray, history: String) {
+    private fun runFirst(qa: Qa, turn: Turn, page: ByteArray, crop: ByteArray, prev: ByteArray?, history: String) {
+        val notebook = qa.origin == Qa.ORIGIN_NOTE
         val content = JSONArray()
-            .put(JSONObject().put("type", "input_text").put("text", Prompts.firstTurnText(qa.lang, qa.subject, history)))
+            .put(JSONObject().put("type", "input_text").put("text",
+                Prompts.firstTurnText(qa.lang, qa.subject, history, notebook, hasPrev = prev != null)))
             .put(image(page))
             .put(JSONObject().put("type", "input_text").put("text", Prompts.zoomLabel(qa.lang)))
             .put(image(crop))
+        if (prev != null) content
+            .put(JSONObject().put("type", "input_text").put("text", Prompts.prevPageLabel(qa.lang)))
+            .put(image(prev))
         val body = baseBody(qa.lang)
             .put("input", JSONArray().put(JSONObject().put("role", "user").put("content", content)))
         streamInto(qa, turn, body)

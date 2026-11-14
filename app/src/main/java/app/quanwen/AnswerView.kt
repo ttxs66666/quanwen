@@ -32,6 +32,13 @@ class AnswerView(
     private val onResized: () -> Unit = {},
     /** 打字追问需要键盘：悬浮卡片要临时变成能获得焦点的窗口。 */
     private val onNeedFocus: (Boolean) -> Unit = {},
+    /**
+     * 笔记本里的回答框：只有一个框，没有 ‹ › 翻页、☰ 会话和底部按钮（追问靠在纸上接着写、再圈）。
+     * 标题栏多一个按钮（「留下」），回答完才能点。
+     */
+    private val minimal: Boolean = false,
+    private val extraLabel: () -> String = { "" },
+    private val onExtra: () -> Unit = {},
 ) : LinearLayout(ctx) {
 
     var current: Qa? = null
@@ -56,7 +63,15 @@ class AnswerView(
     private val nextBtn = iconBtn("›") { step(1) }
     private val menuBtn = iconBtn("☰") { if (sessionsShown) hideSessions() else showSessions() }
     private val closeBtn = iconBtn("×") { onClose() }
+    private val extraBtn = TextView(ctx).apply {
+        textSize = 13f; setTextColor(Colors.INK); gravity = Gravity.CENTER
+        setPadding(ctx.dpi(12f), ctx.dpi(5f), ctx.dpi(12f), ctx.dpi(5f))
+        background = rounded(0x0F000000, ctx.dp(12f), 0x22000000, ctx.dpi(1f))
+        setOnClickListener { onExtra() }
+    }
     private val web = WebView(ctx)
+    /** 回答正文（「留下」时截这一块）。 */
+    val body: View get() = web
     private val footer = LinearLayout(ctx)
     /** 会话列表（点 ☰ 打开），盖在正文的位置上。 */
     private val sessionScroll = android.widget.ScrollView(ctx).apply { visibility = View.GONE }
@@ -84,7 +99,12 @@ class AnswerView(
 
         header.addView(chip)
         header.addView(title, LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        header.addView(prevBtn); header.addView(posText); header.addView(nextBtn); header.addView(menuBtn); header.addView(closeBtn)
+        header.addView(prevBtn); header.addView(posText); header.addView(nextBtn); header.addView(menuBtn)
+        if (minimal) {
+            title.maxLines = 1
+            header.addView(extraBtn, LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { marginStart = ctx.dpi(6f) })
+        }
+        header.addView(closeBtn)
         addView(header)
         sessionScroll.addView(sessionList)
         addView(sessionScroll, if (fill) LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
@@ -112,6 +132,8 @@ class AnswerView(
         addView(footer)
         askInput.visibility = View.GONE
         addView(askInput)
+        // 笔记本的回答框没有底部按钮：底下留点空，正文不压到圆角里（「留下」截图时角上才不会带出纸色）
+        if (minimal) { footer.visibility = View.GONE; menuBtn.visibility = View.GONE; setPadding(ctx.dpi(2f), ctx.dpi(2f), ctx.dpi(2f), ctx.dpi(14f)) }
         applyStrings()
     }
 
@@ -122,6 +144,7 @@ class AnswerView(
         revealBtn.text = loc.getString(R.string.btn_reveal)
         askBtn.text = loc.getString(R.string.btn_ask)
         askInput.applyStrings()
+        extraBtn.text = extraLabel()
         renderHeader()
     }
 
@@ -240,7 +263,8 @@ class AnswerView(
             askBtn.isEnabled = can; askBtn.alpha = 0.4f
             return
         }
-        prevBtn.visibility = View.VISIBLE; nextBtn.visibility = View.VISIBLE; posText.visibility = View.VISIBLE
+        if (!minimal) { prevBtn.visibility = View.VISIBLE; nextBtn.visibility = View.VISIBLE; posText.visibility = View.VISIBLE }
+        else { prevBtn.visibility = View.GONE; nextBtn.visibility = View.GONE; posText.visibility = View.GONE; menuBtn.visibility = View.GONE }
         val qa = current ?: return
         val type = qa.type.ifBlank { if (qa.busy) "…" else "" }
         chip.text = type
@@ -256,6 +280,8 @@ class AnswerView(
         moreBtn.isEnabled = canFollow; revealBtn.isEnabled = canFollow
         moreBtn.alpha = if (canFollow) 1f else 0.4f; revealBtn.alpha = moreBtn.alpha
         askBtn.isEnabled = canFollow; askBtn.alpha = moreBtn.alpha
+        val done = !qa.busy && qa.turns.any { it.state == Turn.STATE_DONE }
+        extraBtn.isEnabled = done; extraBtn.alpha = if (done) 1f else 0.4f
     }
 
     private fun render() {

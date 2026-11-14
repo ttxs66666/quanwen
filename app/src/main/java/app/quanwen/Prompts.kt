@@ -5,21 +5,42 @@ object Prompts {
 
     fun system(lang: String): String = if (lang == "en") SYSTEM_EN else SYSTEM_ZH
 
-    fun firstTurnText(lang: String, subject: String, history: String): String {
+    /**
+     * 第一轮的文字说明。notebook=true：在圈问自带笔记本里圈的（圈是橙色荧光，没有按钮，追问靠接着写再圈）；
+     * hasPrev：圈在页面上部，附上了上一页。
+     */
+    fun firstTurnText(lang: String, subject: String, history: String, notebook: Boolean = false, hasPrev: Boolean = false): String {
         val sb = StringBuilder()
         if (lang == "en") {
             if (subject.isNotBlank()) sb.append("Subject: ").append(subject).append("\n")
             if (history.isNotBlank()) sb.append("Earlier in this study session (oldest first):\n").append(history).append("\n")
-            sb.append("Image 1 is the whole page; the red ink circles the current question. Image 2 is a zoomed view of the circled area. ")
-            sb.append("This is a newly circled question: start with the Type and Topic lines.")
+            if (notebook) {
+                sb.append("This is a page of handwritten notes in Quanwen's built-in notebook. Image 1 is the whole page; the orange highlighter loop marks the current question (the loop is a selection mark, not something they wrote). Image 2 is a zoomed view of the circled area")
+                sb.append(if (hasPrev) ". Image 3 is the previous page, which may be relevant context.\n" else ".\n")
+                sb.append("They have no buttons in the notebook: to follow up they keep writing on the page and circle again. So the earlier exchanges are the context of this conversation, and what they circled now may be their reply to your last question. If you cannot tell what they want with this circle, ask in one short sentence (for example: what would you like me to do with this problem?); they will write their answer on the page and circle it.\n")
+                sb.append("This is a new circle: start with the Type and Topic lines.")
+            } else {
+                sb.append("Image 1 is the whole page; the red ink circles the current question. Image 2 is a zoomed view of the circled area. ")
+                sb.append("This is a newly circled question: start with the Type and Topic lines.")
+            }
         } else {
             if (subject.isNotBlank()) sb.append("科目：").append(subject).append("\n")
             if (history.isNotBlank()) sb.append("本次学习前面的问答（从早到晚）：\n").append(history).append("\n")
-            sb.append("第一张是整页截图，红色笔迹圈出的是当前问题；第二张是圈内区域的放大图。")
-            sb.append("这是一道新圈出的题，先写类型和题目两行。")
+            if (notebook) {
+                sb.append("这是圈问自带笔记本里的一页手写笔记。第一张是整页，橙色荧光笔圈出的是当前问题（荧光圈是圈选标记，不是他写的内容）；第二张是圈内区域的放大图")
+                sb.append(if (hasPrev) "；第三张是上一页，前面的内容可能和这次有关。\n" else "。\n")
+                sb.append("他在笔记本里没有按钮可点：想追问时，他会在纸上接着写，再圈一次。所以前面的问答就是这次对话的上文，他这次圈的内容可能是在回答你上一次的问题。看不出他圈这里想做什么时，用一句话问他（比如：你圈这道题，是想让我做什么？），他会在纸上写下回答再圈给你。\n")
+                sb.append("这是一次新的圈选，先写类型和题目两行。")
+            } else {
+                sb.append("第一张是整页截图，红色笔迹圈出的是当前问题；第二张是圈内区域的放大图。")
+                sb.append("这是一道新圈出的题，先写类型和题目两行。")
+            }
         }
         return sb.toString()
     }
+
+    fun prevPageLabel(lang: String) = if (lang == "en") "Previous page:" else "上一页："
+
 
     fun zoomLabel(lang: String) = if (lang == "en") "Zoomed view of the circled area:" else "圈内放大图："
 

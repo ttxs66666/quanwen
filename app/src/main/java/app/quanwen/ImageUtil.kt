@@ -37,11 +37,15 @@ object ImageUtil {
      * 生成发给模型的两张图：
      * 整页（画上红圈，缩到长边 [PAGE_MAX]），圈内区域（不带笔迹的原图裁剪，长边最多 [CROP_MAX]）。
      */
-    fun prepare(screen: Bitmap, strokes: List<FloatArray>): Pair<ByteArray, ByteArray> {
+    fun prepare(screen: Bitmap, strokes: List<FloatArray>, marker: Int = MARK_RED): Pair<ByteArray, ByteArray> {
         val page = screen.copy(Bitmap.Config.ARGB_8888, true)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0xFFE53935.toInt(); style = Paint.Style.STROKE
-            strokeWidth = max(4f, screen.width / 320f)
+            style = Paint.Style.STROKE
+            if (marker == MARK_HIGHLIGHT) {   // 笔记本：橙色荧光圈，免得和他自己的红笔混在一起
+                color = 0x99FF8F00.toInt(); strokeWidth = max(10f, screen.width / 110f)
+            } else {
+                color = 0xFFE53935.toInt(); strokeWidth = max(4f, screen.width / 320f)
+            }
             strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
         }
         Canvas(page).drawPath(strokesPath(strokes), paint)
@@ -74,6 +78,8 @@ object ImageUtil {
         return out.toByteArray()
     }
 
+    const val MARK_RED = 0
+    const val MARK_HIGHLIGHT = 1
     const val PAGE_MAX = 1600
     const val CROP_MAX = 1600
 }

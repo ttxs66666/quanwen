@@ -55,6 +55,8 @@ class Qa(
     /** 圈的外接框，屏幕坐标：left, top, right, bottom。用来把卡片放在圈旁边。 */
     var bounds: FloatArray = floatArrayOf(0f, 0f, 0f, 0f),
     val turns: MutableList<Turn> = mutableListOf(),
+    /** 从哪里圈的：空 = 截屏（悬浮条、App 内圈题），[ORIGIN_NOTE] = 自带笔记本。 */
+    var origin: String = "",
 ) {
     val busy: Boolean get() = turns.any { it.state == Turn.STATE_LOADING || it.state == Turn.STATE_STREAMING }
 
@@ -66,10 +68,12 @@ class Qa(
         val b = JSONArray(); bounds.forEach { b.put(it.toDouble()) }
         return JSONObject().put("id", id).put("sessionId", sessionId).put("subject", subject)
             .put("time", time).put("lang", lang).put("type", type).put("title", title)
-            .put("bounds", b).put("turns", arr)
+            .put("bounds", b).put("turns", arr).put("origin", origin)
     }
 
     companion object {
+        const val ORIGIN_NOTE = "note"
+
         fun fromJson(o: JSONObject): Qa {
             val qa = Qa(
                 id = o.getString("id"),
@@ -82,6 +86,7 @@ class Qa(
             )
             o.optJSONArray("bounds")?.let { b -> if (b.length() == 4) qa.bounds = FloatArray(4) { b.optDouble(it).toFloat() } }
             o.optJSONArray("turns")?.let { arr -> for (i in 0 until arr.length()) qa.turns.add(Turn.fromJson(arr.getJSONObject(i))) }
+            qa.origin = o.optString("origin")
             return qa
         }
     }
@@ -161,9 +166,10 @@ class QaStore(context: Context) {
         try { File(dir, "${qa.id}.json").writeText(qa.toJson().toString()) } catch (_: Exception) { }
     }
 
-    fun saveImages(qa: Qa, page: ByteArray, crop: ByteArray) {
+    fun saveImages(qa: Qa, page: ByteArray, crop: ByteArray, prev: ByteArray? = null) {
         File(dir, "${qa.id}_page.jpg").writeBytes(page)
         File(dir, "${qa.id}_crop.jpg").writeBytes(crop)
+        if (prev != null) prevFile(qa).writeBytes(prev)
     }
 
     /** 手写追问的字迹图。 */
@@ -175,10 +181,12 @@ class QaStore(context: Context) {
 
     fun pageFile(qa: Qa) = File(dir, "${qa.id}_page.jpg")
     fun cropFile(qa: Qa) = File(dir, "${qa.id}_crop.jpg")
+    /** 笔记本里圈在页面上部时，一起发给模型的上一页。 */
+    fun prevFile(qa: Qa) = File(dir, "${qa.id}_prev.jpg")
 
     fun delete(qa: Qa) {
         list.remove(qa)
-        File(dir, "${qa.id}.json").delete(); pageFile(qa).delete(); cropFile(qa).delete()
+        File(dir, "${qa.id}.json").delete(); pageFile(qa).delete(); cropFile(qa).delete(); prevFile(qa).delete()
         qa.turns.forEach { t -> if (t.imagePath.isNotBlank()) File(t.imagePath).delete() }
     }
 
