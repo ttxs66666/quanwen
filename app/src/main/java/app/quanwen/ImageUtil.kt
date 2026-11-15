@@ -65,6 +65,28 @@ object ImageUtil {
         return pageJpeg to cropJpeg
     }
 
+    /**
+     * 「一同书写」发给模型的两张图：整页（问题那一块框上橙色的框）和问题的放大图（不带框）。
+     * r 是问题那一块在 screen 上的范围（像素）。
+     */
+    fun prepareBox(screen: Bitmap, r: RectF): Pair<ByteArray, ByteArray> {
+        val page = screen.copy(Bitmap.Config.ARGB_8888, true)
+        val pad = max(8f, screen.width / 120f)
+        Canvas(page).drawRoundRect(RectF(r.left - pad, r.top - pad, r.right + pad, r.bottom + pad), pad, pad,
+            Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = 0xCCFF8F00.toInt(); strokeWidth = max(4f, screen.width / 300f) })
+        val pageJpeg = jpeg(scaleToMax(page, PAGE_MAX))
+        page.recycle()
+        val m = max(24f, screen.width * 0.03f)
+        val c = Rect(
+            (r.left - m).roundToInt().coerceIn(0, screen.width - 1),
+            (r.top - m).roundToInt().coerceIn(0, screen.height - 1),
+            (r.right + m).roundToInt().coerceIn(1, screen.width),
+            (r.bottom + m).roundToInt().coerceIn(1, screen.height),
+        )
+        val crop = Bitmap.createBitmap(screen, c.left, c.top, max(1, c.width()), max(1, c.height()))
+        return pageJpeg to jpeg(scaleToMax(crop, CROP_MAX))
+    }
+
     fun scaleToMax(b: Bitmap, maxEdge: Int): Bitmap {
         val edge = max(b.width, b.height)
         if (edge <= maxEdge) return b

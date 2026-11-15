@@ -166,6 +166,19 @@
     <string name="marks_need_draft">先写个大概，或者起个名字，再点「AI 优化」。</string>
     <string name="marks_optimize_failed">优化失败：</string>
 
+    <string name="note_fit">复位（铺满屏宽）</string>
+    <string name="note_write">一同书写</string>
+    <string name="write_tip">一同书写（测试）：写下问号（？），停笔 1 秒，AI 就把回答写在你的问题后面。AI 的字可以用橡皮擦掉。问题不明确时 AI 会另起一行问你，你在纸上写下回答、以句号（。）结尾，它再重新回答。</string>
+    <string name="write_failed">一同书写没写成：%1$s</string>
+    <string name="sec_lab">测试功能</string>
+    <string name="write_help">一同书写：在笔记本里写下问号（？）就是在问 AI，AI 直接把回答写在纸上、接在你的问题后面，不再用回答框。问题不明确时 AI 会另起一行问你；你在纸上写下回答、以句号（。）结尾，它再重新回答。笔记本工具栏里也能随时开关。</string>
+    <string name="on">开</string>
+    <string name="off">关</string>
+    <string name="write_hand">AI 的字迹</string>
+    <string name="hand_long">手写体（龙藏体）</string>
+    <string name="hand_standard">标准体</string>
+    <string name="write_sample">在的。① x² = 4 ⇒ x = ±2</string>
+
     <string name="sec_update">更新</string>
     <string name="version_now">当前版本 %1$s（第 %2$d 版）</string>
     <string name="check_update">检查更新</string>

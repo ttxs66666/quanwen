@@ -42,6 +42,8 @@ import kotlin.math.roundToInt
  * 每圈一次开一个回答框：摆在圈的附近、相对稀疏的地方，避开右手放的位置和已经开着的框；可以拖标题栏挪开。
  * 框不会自己关，点 × 才关；关掉之前一直贴在纸上，下次打开笔记本还在。
  * 「留下」把回答变成一张图贴在纸上。长按图片可以删除。每 3 秒把改过的页存一次，离开页面时马上存。
+ * 双指缩放，工具栏的「复位」回到铺满屏宽。
+ * 测试功能「一同书写」（[WriteTogether]）开着时不用圈：写下问号就问 AI，回答直接写在纸上。
  */
 class NoteActivity : Activity() {
     private lateinit var prefs: Prefs
@@ -54,6 +56,8 @@ class NoteActivity : Activity() {
     private lateinit var circleBtn: ToolIcon
     private lateinit var moveBtn: ToolIcon
     private lateinit var eraserBtn: ToolIcon
+    private lateinit var writeBtn: TextView
+    private lateinit var write: WriteTogether
     private lateinit var sessionBtn: TextView
     private val widthBtns = ArrayList<ToolIcon>()
     private val colorBtns = ArrayList<ToolIcon>()
@@ -90,6 +94,9 @@ class NoteActivity : Activity() {
         canvas.onCircle = { pi, strokes -> askAbout(pi, strokes) }
         canvas.onViewport = { placePops() }
         canvas.onImageLongPress = { pi, img, x, y -> imageMenu(pi, img, x, y) }
+        write = WriteTogether(this, canvas, book, prefs) { msg -> Toast.makeText(this, msg, Toast.LENGTH_LONG).show() }
+        canvas.onStrokeCommitted = { pi, s -> write.onStroke(pi, s) }
+        canvas.onPenDown = { write.onPenDown() }
 
         window.statusBarColor = TOOLBAR
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
@@ -121,6 +128,7 @@ class NoteActivity : Activity() {
 
     override fun onDestroy() {
         Engine.removeListener(onQaChanged)
+        if (::write.isInitialized) write.stop()
         for (p in pops) p.view.destroy()   // 只是不显示了；没关的框记在文件里，下次打开还在
         pops.clear()
         if (::canvas.isInitialized) canvas.clearCache()
@@ -135,7 +143,8 @@ class NoteActivity : Activity() {
             p.dirty = false
             val strokes = ArrayList(p.strokes)
             val images = p.images.map { NoteImage(it.id, it.x, it.y, it.w, it.h) }
-            io.execute { try { NoteStore.writePage(book, p.id, strokes, images) } catch (_: Exception) { p.dirty = true } }
+            val glyphs = ArrayList(p.glyphs)
+            io.execute { try { NoteStore.writePage(book, p.id, strokes, images, glyphs) } catch (_: Exception) { p.dirty = true } }
             any = true
         }
         if (any) { book.modified = System.currentTimeMillis(); NoteStore.saveIndex() }
@@ -456,6 +465,13 @@ class NoteActivity : Activity() {
         val imageBtn = icon(ToolIcon.IMAGE) { v -> pickImageMenu(v) }.apply { contentDescription = getString(R.string.note_image) }
         bar.addView(circleBtn); bar.addView(moveBtn); bar.addView(imageBtn)
         bar.addView(divider())
+        bar.addView(icon(ToolIcon.FIT) { canvas.resetZoom() }.apply { contentDescription = getString(R.string.note_fit) })
+        writeBtn = TextView(this).apply {
+            text = getString(R.string.note_write); textSize = 14f; gravity = Gravity.CENTER; maxLines = 1
+            setPadding(dpi(12f), dpi(8f), dpi(12f), dpi(8f))
+            setOnClickListener { toggleWrite() }
+        }
+        bar.addView(writeBtn, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { marginStart = dpi(6f); marginEnd = dpi(8f) })
         sessionBtn = TextView(this).apply {
             textSize = 14f; setTextColor(Colors.INK); gravity = Gravity.CENTER; maxLines = 1
             setPadding(dpi(12f), dpi(8f), dpi(12f), dpi(8f))
@@ -477,7 +493,24 @@ class NoteActivity : Activity() {
         eraserBtn.on = eraser
         colorBtns.forEachIndexed { i, b -> b.on = NotePaper.COLORS[i] == canvas.penColor }
         circleBtn.on = canvas.tool == NoteCanvas.Tool.CIRCLE
+        // 「一同书写」开着时不用圈：写问号就问
+        val writing = ::write.isInitialized && write.enabled
+        circleBtn.visibility = if (writing) View.GONE else View.VISIBLE
+        if (::writeBtn.isInitialized) {
+            writeBtn.setTextColor(if (writing) 0xFFFFFFFF.toInt() else Colors.INK)
+            writeBtn.background = if (writing) rounded(AiInk.INK, dp(16f)) else rounded(0x0F000000, dp(16f), 0x22000000, dpi(1f))
+        }
         moveBtn.on = canvas.tool == NoteCanvas.Tool.MOVE
+    }
+
+    /** 开关「一同书写」（测试功能）。 */
+    private fun toggleWrite() {
+        write.enabled = !write.enabled
+        if (write.enabled) {
+            if (canvas.tool == NoteCanvas.Tool.CIRCLE) canvas.tool = NoteCanvas.Tool.PEN
+            showTip("write", R.string.write_tip)
+        }
+        refreshButtons()
     }
 
     /** 工具栏上显示当前会话：第一道题的题目（太长就截短），还没有题就是「新会话」。 */
@@ -700,6 +733,15 @@ class ToolIcon(ctx: Context, private val kind: Int, private val arg: Int = 0) : 
                 c.drawPath(path, stroke)
                 c.restore()
             }
+            FIT -> {   // 四个角：复位
+                path.moveTo(4f, 9f); path.lineTo(4f, 4f); path.lineTo(9f, 4f)
+                path.moveTo(15f, 4f); path.lineTo(20f, 4f); path.lineTo(20f, 9f)
+                path.moveTo(20f, 15f); path.lineTo(20f, 20f); path.lineTo(15f, 20f)
+                path.moveTo(9f, 20f); path.lineTo(4f, 20f); path.lineTo(4f, 15f)
+                c.drawPath(path, stroke)
+                fill.color = Colors.INK
+                c.drawCircle(12f, 12f, 1.8f, fill)
+            }
             MOVE -> {   // 四向箭头
                 path.moveTo(12f, 3f); path.lineTo(12f, 21f); path.moveTo(3f, 12f); path.lineTo(21f, 12f)
                 path.moveTo(9f, 6f); path.lineTo(12f, 3f); path.lineTo(15f, 6f)
@@ -722,6 +764,7 @@ class ToolIcon(ctx: Context, private val kind: Int, private val arg: Int = 0) : 
         const val MOVE = 6
         const val IMAGE = 7
         const val ERASER = 8
+        const val FIT = 9
         private val WIDTH_ICON = floatArrayOf(1.2f, 2.2f, 4f)
         private const val SELECTED_BG = 0xFFDCE5FF.toInt()
     }

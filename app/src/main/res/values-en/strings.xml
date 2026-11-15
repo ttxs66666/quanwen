@@ -166,6 +166,19 @@
     <string name="marks_need_draft">Write a rough idea or a name first, then tap AI polish.</string>
     <string name="marks_optimize_failed">Polishing failed:</string>
 
+    <string name="note_fit">Reset zoom (fit width)</string>
+    <string name="note_write">Write together</string>
+    <string name="write_tip">Write together (experimental): write a question mark (?) and pause for 1 second; the AI writes its answer right after your question. You can erase the AI\'s writing. If your question is unclear, the AI asks on a new line; write your answer on the page, end it with a full stop (。), and it answers again.</string>
+    <string name="write_failed">Write together failed: %1$s</string>
+    <string name="sec_lab">Experimental</string>
+    <string name="write_help">Write together: in a notebook, writing a question mark (?) asks the AI, and it writes the answer right on the page after your question, with no answer box. If your question is unclear, the AI asks on a new line; write your answer on the page, end it with a full stop (。), and it answers again. You can also switch it on and off from the notebook toolbar.</string>
+    <string name="on">On</string>
+    <string name="off">Off</string>
+    <string name="write_hand">AI handwriting</string>
+    <string name="hand_long">Handwriting (Long Cang)</string>
+    <string name="hand_standard">Standard</string>
+    <string name="write_sample">Yes, I\'m here. ① x² = 4 ⇒ x = ±2</string>
+
     <string name="sec_update">Updates</string>
     <string name="version_now">Version %1$s (build %2$d)</string>
     <string name="check_update">Check for updates</string>

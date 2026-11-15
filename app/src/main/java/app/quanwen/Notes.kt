@@ -37,6 +37,9 @@ object NotePaper {
 
 /** 一笔：颜色、粗细（页面坐标）和点（x0,y0,x1,y1,…，页面坐标）。画完就不再改（橡皮擦断一笔时换成新的几笔）。 */
 class Stroke(val color: Int, val width: Float, val pts: FloatArray) {
+    /** 这次打开笔记本以后第几笔（从 1 起，不存盘；读进来的旧笔迹是 0）。「一同书写」靠它分出问号前面新写的那句话。 */
+    var seq = 0L
+
     /** 外框 [左, 上, 右, 下]（页面坐标）。橡皮擦先用它粗筛，只细看擦得到的笔。 */
     val box: FloatArray by lazy {
         var l = Float.MAX_VALUE; var t = Float.MAX_VALUE; var r = -Float.MAX_VALUE; var b = -Float.MAX_VALUE
@@ -50,6 +53,17 @@ class Stroke(val color: Int, val width: Float, val pts: FloatArray) {
     }
 }
 
+/**
+ * 「一同书写」里 AI 写在纸上的一个字：字、左端和基线（页面坐标）、字号、手写体的轻微倾斜（度）、颜色、字体、
+ * 属于哪一次回答（group）、占的宽度。橡皮擦碰到就整个字擦掉。
+ */
+class NoteGlyph(
+    val ch: String, val x: Float, val y: Float, val size: Float, val rot: Float,
+    val color: Int, val font: Int, val group: String, val w: Float,
+) {
+    fun box() = android.graphics.RectF(x, y - size * AiInk.top(font), x + w, y + size * AiInk.bottom(font))
+}
+
 /** 笔记本里没关掉的回答框：哪道题、贴在哪一页的哪个位置（左上角，页面坐标）。下次打开笔记本还在。 */
 class OpenPop(val qaId: String, val pageId: String, val x: Float, val y: Float)
 
@@ -61,6 +75,8 @@ class NoteImage(val id: String, var x: Float, var y: Float, val w: Float, val h:
 class NotePage(val id: String) {
     val strokes = ArrayList<Stroke>()
     val images = ArrayList<NoteImage>()
+    /** AI 写在纸上的字（「一同书写」）。 */
+    val glyphs = ArrayList<NoteGlyph>()
     /** 每改一次加一，画面缓存靠它判断要不要重画。 */
     var version = 0
     var dirty = false
@@ -137,7 +153,7 @@ object NoteStore {
         try {
             DataInputStream(BufferedInputStream(FileInputStream(f))).use { inp ->
                 val magic = inp.readInt()
-                if (magic != MAGIC && magic != MAGIC2) return page
+                if (magic != MAGIC && magic != MAGIC2 && magic != MAGIC3) return page
                 val n = inp.readInt()
                 repeat(n) {
                     val color = inp.readInt()
@@ -147,8 +163,12 @@ object NoteStore {
                     for (i in 0 until count) pts[i] = inp.readFloat()
                     page.strokes.add(Stroke(color, width, pts))
                 }
-                if (magic == MAGIC2) repeat(inp.readInt()) {
+                if (magic != MAGIC) repeat(inp.readInt()) {
                     page.images.add(NoteImage(inp.readUTF(), inp.readFloat(), inp.readFloat(), inp.readFloat(), inp.readFloat()))
+                }
+                if (magic == MAGIC3) repeat(inp.readInt()) {
+                    page.glyphs.add(NoteGlyph(inp.readUTF(), inp.readFloat(), inp.readFloat(), inp.readFloat(), inp.readFloat(),
+                        inp.readInt(), inp.readInt(), inp.readUTF(), inp.readFloat()))
                 }
             }
         } catch (_: Exception) { }
@@ -156,12 +176,12 @@ object NoteStore {
     }
 
     /** 在后台线程调用；strokes 是调用方拍下的快照。先写临时文件再改名，写到一半断电也不会坏。 */
-    fun writePage(nb: Notebook, pageId: String, strokes: List<Stroke>, images: List<NoteImage>) {
+    fun writePage(nb: Notebook, pageId: String, strokes: List<Stroke>, images: List<NoteImage>, glyphs: List<NoteGlyph>) {
         val f = pageFile(nb, pageId)
         f.parentFile?.mkdirs()
         val tmp = File(f.parentFile, f.name + ".tmp")
         DataOutputStream(BufferedOutputStream(FileOutputStream(tmp))).use { out ->
-            out.writeInt(MAGIC2)
+            out.writeInt(MAGIC3)
             out.writeInt(strokes.size)
             for (s in strokes) {
                 out.writeInt(s.color)
@@ -171,6 +191,11 @@ object NoteStore {
             }
             out.writeInt(images.size)
             for (im in images) { out.writeUTF(im.id); out.writeFloat(im.x); out.writeFloat(im.y); out.writeFloat(im.w); out.writeFloat(im.h) }
+            out.writeInt(glyphs.size)
+            for (g in glyphs) {
+                out.writeUTF(g.ch); out.writeFloat(g.x); out.writeFloat(g.y); out.writeFloat(g.size); out.writeFloat(g.rot)
+                out.writeInt(g.color); out.writeInt(g.font); out.writeUTF(g.group); out.writeFloat(g.w)
+            }
         }
         if (!tmp.renameTo(f)) { f.delete(); tmp.renameTo(f) }
     }
@@ -207,6 +232,18 @@ object NoteStore {
         return if (png.exists()) png else File(File(root, nb.id), "img_$id.jpg")
     }
 
+    /** 笔记本目录里的一个小文本文件（比如「一同书写」里 AI 正在等他回答的询问）；没有就是 null。 */
+    fun loadText(nb: Notebook, name: String): String? {
+        val f = File(File(root, nb.id), name)
+        return if (f.exists()) try { f.readText() } catch (_: Exception) { null } else null
+    }
+
+    /** text 为 null 时删掉这个文件。 */
+    fun saveText(nb: Notebook, name: String, text: String?) {
+        val f = File(File(root, nb.id).apply { mkdirs() }, name)
+        if (text == null) f.delete() else try { f.writeText(text) } catch (_: Exception) { }
+    }
+
     fun loadPops(nb: Notebook): List<OpenPop> {
         val f = File(File(root, nb.id), "pops.json")
         if (!f.exists()) return emptyList()
@@ -228,4 +265,5 @@ object NoteStore {
 
     private const val MAGIC = 0x51575031    // "QWP1"：只有笔迹
     private const val MAGIC2 = 0x51575032   // "QWP2"：笔迹 + 贴图
+    private const val MAGIC3 = 0x51575033   // "QWP3"：笔迹 + 贴图 + AI 写的字
 }

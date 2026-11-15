@@ -55,7 +55,7 @@ class Qa(
     /** 圈的外接框，屏幕坐标：left, top, right, bottom。用来把卡片放在圈旁边。 */
     var bounds: FloatArray = floatArrayOf(0f, 0f, 0f, 0f),
     val turns: MutableList<Turn> = mutableListOf(),
-    /** 从哪里圈的：空 = 截屏（悬浮条、App 内圈题），[ORIGIN_NOTE] = 自带笔记本。 */
+    /** 从哪里圈的：空 = 截屏（悬浮条、App 内圈题），[ORIGIN_NOTE] = 自带笔记本，[ORIGIN_WRITE] = 笔记本里的「一同书写」。 */
     var origin: String = "",
     /** 在笔记本里圈的：笔记本的名字（比如「偏微分方程」）。 */
     var book: String = "",
@@ -75,6 +75,7 @@ class Qa(
 
     companion object {
         const val ORIGIN_NOTE = "note"
+        const val ORIGIN_WRITE = "write"
 
         fun fromJson(o: JSONObject): Qa {
             val qa = Qa(

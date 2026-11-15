@@ -226,6 +226,24 @@ class MainActivity : Activity() {
         col.addView(marksText)
         col.addView(row(button(getString(R.string.marks_open)) { startActivity(Intent(this, MarksActivity::class.java)) }))
 
+        // 测试功能
+        section(getString(R.string.sec_lab))
+        col.addView(text(getString(R.string.write_help), 13f, Colors.MUTED).apply { setPadding(0, 0, 0, dpi(4f)) })
+        col.addView(choice(listOf("off" to getString(R.string.off), "on" to getString(R.string.on)), if (prefs.writeTogether) "on" else "off") {
+            prefs.writeTogether = it == "on"
+        })
+        col.addView(text(getString(R.string.write_hand), 13f, Colors.MUTED).apply { setPadding(0, dpi(10f), 0, dpi(2f)) })
+        val sample = TextView(this).apply {
+            text = getString(R.string.write_sample); textSize = 22f; setTextColor(AiInk.INK)
+            typeface = AiInk.typeface(this@MainActivity, prefs.aiHand)
+        }
+        col.addView(choice(listOf(AiInk.HAND.toString() to getString(R.string.hand_long), AiInk.STANDARD.toString() to getString(R.string.hand_standard)),
+            prefs.aiHand.toString()) {
+            prefs.aiHand = it.toInt()
+            sample.typeface = AiInk.typeface(this, prefs.aiHand)
+        })
+        col.addView(sample.apply { setPadding(0, dpi(8f), 0, 0) })
+
         // 语言
         section(getString(R.string.sec_lang))
         col.addView(choice(listOf("zh" to "中文", "en" to "English"), prefs.lang) { v ->

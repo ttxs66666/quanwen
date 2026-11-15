@@ -82,6 +82,16 @@ class Prefs(context: Context) {
         get() = sp.getString("marks", null)
         set(v) = sp.edit().apply { if (v == null) remove("marks") else putString("marks", v) }.apply()
 
+    /** 测试功能「一同书写」：笔记本里写问号就问 AI，AI 把回答写在纸上。 */
+    var writeTogether: Boolean
+        get() = sp.getBoolean("writeTogether", false)
+        set(v) = sp.edit().putBoolean("writeTogether", v).apply()
+
+    /** 「一同书写」里 AI 的字迹：[AiInk.STANDARD] 标准体，[AiInk.HAND] 手写体（龙藏体）。 */
+    var aiHand: Int
+        get() = sp.getInt("aiHand", AiInk.HAND)
+        set(v) = sp.edit().putInt("aiHand", v).apply()
+
     /** 笔记本里橡皮擦的大小档位（0..2）。 */
     var noteEraser: Int
         get() = sp.getInt("noteEraser", 1)

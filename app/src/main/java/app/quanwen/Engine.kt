@@ -2,6 +2,7 @@ package app.quanwen
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.RectF
 import android.os.Handler
 import android.os.Looper
 import android.util.Base64
@@ -109,7 +110,77 @@ object Engine {
         io.execute { streamInto(qa, turn, body) }
     }
 
+    // ---------- 「一同书写」 ----------
+
+    /**
+     * 笔记本里写了一个问号：page 是整页（宽 [ImageUtil.PAGE_MAX]），region 是问题那一块在 page 上的范围（像素），
+     * prevPage 是问题靠近页顶时附上的上一页，layout 告诉 AI 每行大约能写几个字。回答的正文会被写到纸上。
+     */
+    fun askWrite(page: Bitmap, region: RectF, prevPage: Bitmap?, book: String, layout: String): Qa {
+        val qa = store.create("", prefs.lang)
+        qa.origin = Qa.ORIGIN_WRITE
+        qa.book = book
+        qa.type = if (prefs.lang == "en") "Write" else "书写"
+        val turn = Turn(Turn.KIND_FIRST)
+        qa.turns.add(turn)
+        val history = store.historyText(qa)
+        store.save(qa)
+        notify(qa, false)
+        io.execute {
+            try {
+                val (pj, cj) = ImageUtil.prepareBox(page, region)
+                page.recycle()
+                val prev = prevPage?.let { p ->
+                    val s = ImageUtil.scaleToMax(p, ImageUtil.PAGE_MAX)
+                    ImageUtil.jpeg(s).also { if (s !== p) s.recycle(); p.recycle() }
+                }
+                store.saveImages(qa, pj, cj, prev, null)
+                val content = JSONArray()
+                    .put(text(Prompts.writeFirstText(qa.lang, qa.book, history, prev != null, layout)))
+                    .put(image(pj))
+                    .put(text(Prompts.zoomLabel(qa.lang)))
+                    .put(image(cj))
+                if (prev != null) content.put(text(Prompts.prevPageLabel(qa.lang))).put(image(prev))
+                val body = baseBody(qa.lang, Prompts.writeSystem(qa.lang))
+                    .put("input", JSONArray().put(JSONObject().put("role", "user").put("content", content)))
+                streamInto(qa, turn, body)
+            } catch (e: Exception) {
+                main.post { fail(qa, turn, e.toString()) }
+            }
+        }
+        return qa
+    }
+
+    /** 他在纸上回答了 AI 的询问（以句号结尾）：接着这道题的对话发过去，AI 重新回答。返回是否发出去了。 */
+    fun clarifyWrite(qa: Qa, page: Bitmap, region: RectF, layout: String): Boolean {
+        if (qa.busy) return false
+        val prev = qa.lastResponseId ?: return false
+        val turn = Turn(Turn.KIND_ASK)
+        qa.turns.add(turn)
+        notify(qa, false)
+        io.execute {
+            try {
+                val (pj, cj) = ImageUtil.prepareBox(page, region)
+                page.recycle()
+                val content = JSONArray()
+                    .put(text(Prompts.writeClarify(qa.lang, layout)))
+                    .put(image(pj))
+                    .put(image(cj))
+                val body = baseBody(qa.lang, Prompts.writeSystem(qa.lang))
+                    .put("previous_response_id", prev)
+                    .put("input", JSONArray().put(JSONObject().put("role", "user").put("content", content)))
+                streamInto(qa, turn, body)
+            } catch (e: Exception) {
+                main.post { fail(qa, turn, e.toString()) }
+            }
+        }
+        return true
+    }
+
+    private fun text(s: String) = JSONObject().put("type", "input_text").put("text", s)
+
     fun retry(qa: Qa, index: Int) {
+        if (qa.origin == Qa.ORIGIN_WRITE) return   // 「一同书写」的回答写在纸上，不在这里重试
         val turn = qa.turns.getOrNull(index) ?: return
         if (turn.state != Turn.STATE_ERROR || qa.busy) return
         if (turn.kind == Turn.KIND_FIRST) {
@@ -153,9 +224,9 @@ object Engine {
     private fun image(bytes: ByteArray) = JSONObject().put("type", "input_image").put("detail", "high")
         .put("image_url", "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP))
 
-    private fun baseBody(lang: String) = JSONObject()
+    private fun baseBody(lang: String, instructions: String = Prompts.system(lang)) = JSONObject()
         .put("model", prefs.model)
-        .put("instructions", Prompts.system(lang))
+        .put("instructions", instructions)
         .put("reasoning", JSONObject().put("effort", prefs.effort))
 
     /** 后台线程。 */
