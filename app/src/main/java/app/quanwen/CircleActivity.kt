@@ -125,7 +125,7 @@ class CircleActivity : Activity() {
         bar.addView(button(getString(R.string.src_paste)) { paste() })
         hint = TextView(this).apply {
             textSize = 13f; setTextColor(Colors.MUTED); setPadding(dpi(12f), 0, 0, 0)
-            text = getString(R.string.circle_hint); maxLines = 2
+            text = getString(R.string.circle_hint, Marks.hint(this@CircleActivity)); maxLines = 2
         }
         bar.addView(hint, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         // 右上角 ☰：新建会话、切换会话
@@ -197,7 +197,7 @@ class CircleActivity : Activity() {
     private fun show(b: Bitmap) {
         lasso.setImage(b)
         empty.visibility = View.GONE
-        hint.text = getString(R.string.circle_hint)
+        hint.text = getString(R.string.circle_hint, Marks.hint(this))
         hint.setTextColor(Colors.MUTED)
     }
 

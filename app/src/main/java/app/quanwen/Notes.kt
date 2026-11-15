@@ -35,8 +35,23 @@ object NotePaper {
     val COLORS = intArrayOf(0xFF1A1A1A.toInt(), 0xFFE0322B.toInt(), 0xFF1559F0.toInt())
 }
 
-/** 一笔：颜色、粗细（页面坐标）和点（x0,y0,x1,y1,…，页面坐标）。画完就不再改。 */
-class Stroke(val color: Int, val width: Float, val pts: FloatArray)
+/** 一笔：颜色、粗细（页面坐标）和点（x0,y0,x1,y1,…，页面坐标）。画完就不再改（橡皮擦断一笔时换成新的几笔）。 */
+class Stroke(val color: Int, val width: Float, val pts: FloatArray) {
+    /** 外框 [左, 上, 右, 下]（页面坐标）。橡皮擦先用它粗筛，只细看擦得到的笔。 */
+    val box: FloatArray by lazy {
+        var l = Float.MAX_VALUE; var t = Float.MAX_VALUE; var r = -Float.MAX_VALUE; var b = -Float.MAX_VALUE
+        var i = 0
+        while (i + 1 < pts.size) {
+            val x = pts[i]; val y = pts[i + 1]
+            if (x < l) l = x; if (x > r) r = x; if (y < t) t = y; if (y > b) b = y
+            i += 2
+        }
+        floatArrayOf(l, t, r, b)
+    }
+}
+
+/** 笔记本里没关掉的回答框：哪道题、贴在哪一页的哪个位置（左上角，页面坐标）。下次打开笔记本还在。 */
+class OpenPop(val qaId: String, val pageId: String, val x: Float, val y: Float)
 
 /** 贴在页上的图片（比如「留下」的 AI 回答）：文件名和位置大小（页面坐标）。 */
 class NoteImage(val id: String, var x: Float, var y: Float, val w: Float, val h: Float) {
@@ -190,6 +205,23 @@ object NoteStore {
     fun imageFile(nb: Notebook, id: String): File {
         val png = File(File(root, nb.id), "img_$id.png")
         return if (png.exists()) png else File(File(root, nb.id), "img_$id.jpg")
+    }
+
+    fun loadPops(nb: Notebook): List<OpenPop> {
+        val f = File(File(root, nb.id), "pops.json")
+        if (!f.exists()) return emptyList()
+        return try {
+            val a = JSONArray(f.readText())
+            (0 until a.length()).map { a.getJSONObject(it) }
+                .map { OpenPop(it.getString("qa"), it.getString("page"), it.optDouble("x", 0.0).toFloat(), it.optDouble("y", 0.0).toFloat()) }
+        } catch (_: Exception) { emptyList() }
+    }
+
+    fun savePops(nb: Notebook, pops: List<OpenPop>) {
+        val dir = File(root, nb.id).apply { mkdirs() }
+        val a = JSONArray()
+        for (p in pops) a.put(JSONObject().put("qa", p.qaId).put("page", p.pageId).put("x", p.x.toDouble()).put("y", p.y.toDouble()))
+        try { File(dir, "pops.json").writeText(a.toString()) } catch (_: Exception) { }
     }
 
     private fun newId() = UUID.randomUUID().toString().replace("-", "").take(16)

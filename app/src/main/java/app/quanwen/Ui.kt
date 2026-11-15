@@ -23,9 +23,12 @@ object Colors {
         type.contains("揭晓") || type.contains("Reveal", true) -> 0xFF6B4FA0.toInt()
         type.contains("根源") || type.contains("Root", true) -> 0xFF8A4F7D.toInt()
         type.contains("解题") || type.contains("Solve", true) -> 0xFF1F7A8C.toInt()
+        type.contains("提问") || type.contains("Question", true) -> 0xFF2F5D9E.toInt()
         type.isBlank() -> MUTED
-        else -> 0xFF2F5D9E.toInt()
+        else -> CUSTOM[Math.floorMod(type.hashCode(), CUSTOM.size)]   // 用户自己设的模式记号
     }
+
+    private val CUSTOM = intArrayOf(0xFF9C4A1A.toInt(), 0xFF5B6B1E.toInt(), 0xFF3E5C8A.toInt(), 0xFFA0436B.toInt(), 0xFF2F7D6D.toInt())
 }
 
 /** 标题栏是普通文字，不渲染公式：把常见的 LaTeX 写法换成普通字符。 */
@@ -41,6 +44,22 @@ fun plainMath(s: String): String {
     t = t.replace(Regex("\\\\(?:mathrm|mathbf|mathsf|text|operatorname)\\{([^}]*)\\}"), "$1")
     t = t.replace(Regex("\\\\[,;! ]"), " ").replace("$", "").replace("{", "").replace("}", "")
     return t.replace(Regex("\\\\([A-Za-z]+)"), "$1").replace(Regex(" {2,}"), " ").trim()
+}
+
+/**
+ * 把一个可滚动的页面包一层，键盘弹出时页面底部让出键盘的高度，正在输入的框就会滚到键盘上面。
+ * 安卓 15 起（targetSdk 35）系统不再替 App 缩小窗口，adjustResize 不管用了，要自己让；更早的系统照旧由系统处理。
+ */
+fun android.app.Activity.imeAware(scroll: android.widget.ScrollView): android.view.View {
+    val root = android.widget.FrameLayout(this)
+    root.addView(scroll, android.widget.FrameLayout.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT))
+    if (android.os.Build.VERSION.SDK_INT >= 35) root.setOnApplyWindowInsetsListener { _, insets ->
+        val bottom = insets.getInsets(android.view.WindowInsets.Type.ime()).bottom
+        val lp = scroll.layoutParams as android.widget.FrameLayout.LayoutParams
+        if (lp.bottomMargin != bottom) { lp.bottomMargin = bottom; scroll.layoutParams = lp }
+        insets
+    }
+    return root
 }
 
 fun rounded(color: Int, radius: Float, strokeColor: Int = 0, strokeWidth: Int = 0) = GradientDrawable().apply {

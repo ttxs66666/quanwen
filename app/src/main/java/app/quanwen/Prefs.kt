@@ -77,6 +77,16 @@ class Prefs(context: Context) {
         sp.edit().putStringSet("tipsOff", s).apply()
     }
 
+    /** 模式记号（[Marks]）的 JSON；null 表示没改过，用默认的 gg、j。 */
+    var marksJson: String?
+        get() = sp.getString("marks", null)
+        set(v) = sp.edit().apply { if (v == null) remove("marks") else putString("marks", v) }.apply()
+
+    /** 笔记本里橡皮擦的大小档位（0..2）。 */
+    var noteEraser: Int
+        get() = sp.getInt("noteEraser", 1)
+        set(v) = sp.edit().putInt("noteEraser", v).apply()
+
     /** 笔记本里上次用的笔：颜色和粗细的档位（0..2）。 */
     var noteColor: Int
         get() = sp.getInt("noteColor", 0)

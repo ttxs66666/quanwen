@@ -4,7 +4,7 @@
     <string name="service_desc">Shows the circle/card float bar. The screen is captured only when you tap the circle button, so you can circle a question and send it to the AI.</string>
 
     <string name="lasso_hint">Circle your question</string>
-    <string name="lasso_sending">Sends after a 1-second pause; keep drawing to extend the circle, or write gg for roots or j to solve</string>
+    <string name="lasso_sending">Sends after a 1-second pause; keep drawing to extend the circle%1$s</string>
     <string name="lasso_redo">Redo</string>
     <string name="lasso_cancel">Cancel</string>
 
@@ -80,7 +80,7 @@
     <string name="src_latest">Latest screenshot</string>
     <string name="src_pick">Gallery</string>
     <string name="src_camera">Camera</string>
-    <string name="circle_hint">Circle your question, then write gg for roots or j to solve if you like; pinch to zoom. New screenshots load automatically.</string>
+    <string name="circle_hint">Circle your question%1$s; pinch to zoom. New screenshots load automatically.</string>
     <string name="circle_empty">Load an image with the buttons above (latest screenshot, screenshot — temporary, never saved to the gallery — gallery or paste), or drag a screenshot here.</string>
     <string name="latest_loaded">Loaded the latest screenshot</string>
     <string name="no_screenshot">No screenshot found</string>
@@ -123,19 +123,48 @@
     <string name="note_undo">Undo</string>
     <string name="note_redo">Redo</string>
     <string name="note_circle">Circle to ask AI</string>
-    <string name="note_circle_hint">Circle the question with the highlighter; it goes to the AI when you pause for 1 second. Write gg after circling for roots, or j to solve</string>
+    <string name="note_circle_hint">Circle the question with the highlighter; it goes to the AI when you pause for 1 second%1$s. Each circle opens its own answer box, which stays until you tap ×.</string>
+    <string name="marks_hint">; after circling you can write a mark to switch mode (%1$s)</string>
+    <string name="note_eraser">Eraser</string>
+    <string name="note_eraser_hint">Eraser: rubs out whatever it passes over; undo if you erase too much. While the eraser is on, the three widths on the left set its size. If your pen has an eraser end, flip it over to erase.</string>
+    <string name="note_image_delete">Delete picture</string>
+    <string name="note_image_deleted">Picture deleted; tap Undo to bring it back</string>
     <string name="note_move">Move pictures</string>
-    <string name="note_move_hint">You can now drag pictures on the page; tap the × on a picture to delete it</string>
+    <string name="note_move_hint">You can now drag pictures on the page; tap the × on a picture to delete it. You can also long-press a picture to delete it.</string>
     <string name="note_keep">Keep</string>
     <string name="tip_ok">Got it</string>
     <string name="note_image">Insert picture</string>
     <string name="note_image_gallery">From gallery</string>
     <string name="note_image_files">From files</string>
-    <string name="note_image_added">The picture is on the page. Drag it now, or tap the × at its corner to delete it; when it\'s in place, tap Move pictures in the toolbar to go back to writing.</string>
+    <string name="note_image_added">The picture is on the page. Drag it now, or tap the × at its corner to delete it; when it\'s in place, tap Move pictures in the toolbar to go back to writing. Later, long-press a picture to delete it.</string>
     <string name="tip_never">Don\'t show again</string>
-    <string name="note_kept">Pinned to the page. To move it, tap Move pictures in the toolbar first.</string>
+    <string name="note_kept">Pinned to the page. To move it, tap Move pictures in the toolbar first; long-press it to delete it.</string>
     <string name="note_keep_failed">Couldn\'t keep this answer. Drag the answer box fully on screen and try again.</string>
     <string name="note_session">Session: %1$s ▾</string>
+
+    <string name="sec_marks">Mode marks</string>
+    <string name="marks_now">After circling, write a few letters outside the circle to get a different kind of answer that time. Current marks: %1$s</string>
+    <string name="marks_now_none">After circling, write a few letters outside the circle to get a different kind of answer that time. No marks are set.</string>
+    <string name="marks_open">Set up mode marks</string>
+    <string name="marks_title">Mode marks</string>
+    <string name="marks_help">After circling a question, handwrite one of the marks below outside the circle, and that answer follows the mark\'s prompt. A mark is really just a prompt written in advance: when the AI reads your letters, it answers by that text.\n· 1 to 3 letters, English letters only, case doesn\'t matter.\n· The name shows on the answer\'s type label.\n· A rough prompt is fine: tap AI polish to have the AI rewrite it to fit Quanwen, and Restore if you don\'t like the result.\n· Changes are saved when you leave this page.</string>
+    <string name="marks_letters">Letters</string>
+    <string name="marks_name">Name</string>
+    <string name="marks_name_hint">e.g. Roots</string>
+    <string name="marks_prompt">Prompt</string>
+    <string name="marks_prompt_hint">How the AI should answer in this mode, e.g. explain the idea with an everyday example</string>
+    <string name="marks_optimize">AI polish</string>
+    <string name="marks_optimizing">Polishing…</string>
+    <string name="marks_restore">Restore</string>
+    <string name="marks_add">+ Add a mark</string>
+    <string name="marks_reset">Reset to defaults</string>
+    <string name="marks_reset_confirm">Go back to the default marks, gg Roots and j Solve? Marks you changed or added will be removed.</string>
+    <string name="marks_err_letters">Use 1 to 3 English letters</string>
+    <string name="marks_err_dup">Same letters as another mark: %1$s</string>
+    <string name="marks_err_prompt">The prompt is empty (a rough idea is fine; then tap AI polish)</string>
+    <string name="marks_skipped">%1$d mark(s) were incomplete or had duplicate letters and were not saved.</string>
+    <string name="marks_need_draft">Write a rough idea or a name first, then tap AI polish.</string>
+    <string name="marks_optimize_failed">Polishing failed:</string>
 
     <string name="sec_update">Updates</string>
     <string name="version_now">Version %1$s (build %2$d)</string>

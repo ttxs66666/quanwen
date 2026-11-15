@@ -24,10 +24,12 @@ import kotlin.math.roundToInt
 /**
  * 笔记本的画布：纸张一页页竖着排，宽度撑满（左右留边），上下滚动。
  *
- * 三种工具：
+ * 四种工具：
  *  - 笔：黑红蓝三色、三档粗细。撤回、还原一次一笔。
+ *  - 橡皮擦：划过哪里擦掉哪里（一笔被擦断就分成几笔），三档大小。笔尾的橡皮头、按着笔上的按键也能擦。
  *  - 圈：荧光笔画一个圈，停笔 1 秒就发给 AI（[onCircle]），荧光慢慢淡掉，不留在纸上；发完自动回到笔。
  *  - 移动图片：只有这个模式下才能拖动贴在纸上的图片（「留下」的回答），避免写字时误碰。选中的图片右上角有 × 可以删掉。
+ * 任何工具下（圈除外）长按一张图片，都会弹出删除 / 移动的菜单（[onImageLongPress]）。
  *
  * 输入：用过触控笔以后只有笔能写，手指一根就滚动（防手掌误触）；没用过笔的设备上一根手指写、两根手指滚动。
  * 每页画成一张缓存图（只留看得见的几页），滚动时直接贴图；正在写的这一笔、荧光圈、正在拖的图片单独画在上面。
@@ -41,7 +43,7 @@ class NoteCanvas(
     private val onChanged: () -> Unit,
 ) : View(ctx) {
 
-    enum class Tool { PEN, CIRCLE, MOVE }
+    enum class Tool { PEN, CIRCLE, MOVE, ERASER }
 
     var tool = Tool.PEN
         set(v) {
@@ -54,12 +56,16 @@ class NoteCanvas(
         }
     var penColor = NotePaper.COLORS[0]
     var penWidth = NotePaper.WIDTHS[1]
+    /** 橡皮擦的半径（页面坐标）。 */
+    var eraserSize = ERASER_SIZES[1]
 
     /** 圈完停笔 1 秒后调用：圈在第几页、圈里的所有笔迹（页面坐标）。 */
     var onCircle: ((Int, List<FloatArray>) -> Unit)? = null
     var onToolChanged: (() -> Unit)? = null
     /** 滚动或尺寸变了（贴着纸的回答框要跟着走）。 */
     var onViewport: (() -> Unit)? = null
+    /** 长按了一张图片：第几页、哪张图、按的位置（画布坐标）。菜单关掉时调 [clearPressed]。 */
+    var onImageLongPress: ((Int, NoteImage, Float, Float) -> Unit)? = null
 
     private val prefs = Prefs(ctx)
     private var stylusSeen = prefs.stylusSeen
@@ -88,6 +94,8 @@ class NoteCanvas(
         class AddImage(page: NotePage, val img: NoteImage) : Op(page)
         class RemoveImage(page: NotePage, val img: NoteImage) : Op(page)
         class MoveImage(page: NotePage, val img: NoteImage, val fx: Float, val fy: Float, val tx: Float, val ty: Float) : Op(page)
+        /** 橡皮擦的一下：这一页擦之前、擦之后的笔迹。 */
+        class ReplaceStrokes(page: NotePage, val before: List<Stroke>, val after: List<Stroke>) : Op(page)
     }
     private val undoStack = ArrayDeque<Op>()
     private val redoStack = ArrayDeque<Op>()
@@ -101,7 +109,7 @@ class NoteCanvas(
     private val imgCache = HashMap<String, Bitmap>()
 
     // ---------- 正在进行的手势 ----------
-    private enum class Mode { NONE, DRAW, SCROLL, DRAG }
+    private enum class Mode { NONE, DRAW, SCROLL, DRAG, ERASE }
     private var mode = Mode.NONE
     private var drawPointer = -1
     private var drawPage = -1
@@ -116,6 +124,19 @@ class NoteCanvas(
     private var circleAlpha = 1f
     private var fade: ValueAnimator? = null
     private val sendCircle = Runnable { finishCircle() }
+
+    // 橡皮擦：这一下擦之前的笔迹（擦到东西才拍），上一个点（页面坐标），橡皮在屏幕上的位置
+    private var eraseBefore: List<Stroke>? = null
+    private val eraseLast = PointF()
+    private val eraseView = PointF()
+
+    // 长按图片
+    private var pressImg: Pair<Int, NoteImage>? = null
+    private val pressDown = PointF()
+    private val slop = android.view.ViewConfiguration.get(ctx).scaledTouchSlop.toFloat()
+    private val longPress = Runnable { fireLongPress() }
+    /** 长按着的图片：菜单开着时画一个虚线框。 */
+    private var pressed: Pair<NotePage, NoteImage>? = null
 
     // 移动图片
     private var selected: Pair<NotePage, NoteImage>? = null
@@ -143,6 +164,9 @@ class NoteCanvas(
         style = Paint.Style.STROKE; strokeWidth = ctx.dp(2f); color = 0xFFFFFFFF.toInt(); strokeCap = Paint.Cap.ROUND
     }
     private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG)
+    private val eraserPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE; strokeWidth = ctx.dp(1.5f); color = 0x99000000.toInt()
+    }
     private val path = Path()
     private val handleR = ctx.dp(13f)
 
@@ -198,6 +222,7 @@ class NoteCanvas(
             is Op.AddImage -> if (forward) page.images.add(op.img) else page.images.remove(op.img)
             is Op.RemoveImage -> if (forward) page.images.remove(op.img) else page.images.add(op.img)
             is Op.MoveImage -> if (forward) { op.img.x = op.tx; op.img.y = op.ty } else { op.img.x = op.fx; op.img.y = op.fy }
+            is Op.ReplaceStrokes -> { page.strokes.clear(); page.strokes.addAll(if (forward) op.after else op.before) }
         }
         if (op !is Op.AddStroke) { page.changed(); dropPageCache(page) }
         if (selected?.second?.let { s -> page.images.none { it === s } } == true) selected = null
@@ -255,15 +280,23 @@ class NoteCanvas(
                 val writes = stylus || !stylusSeen
                 when {
                     tool == Tool.MOVE -> if (!startDrag(e)) startScroll(e)
+                    writes && erases(e, 0) && startErase(e, 0) -> requestUnbufferedDispatch(e)
                     writes && startDraw(e, 0) -> requestUnbufferedDispatch(e)   // 降低笔迹延迟
                     else -> startScroll(e)
                 }
+                armLongPress(e)
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
+                cancelImagePress()
                 val idx = e.actionIndex
                 when {
-                    // 手先碰到（滚动中），接着笔落下：改成写字
-                    mode == Mode.SCROLL && tool != Tool.MOVE && isStylus(e, idx) -> { stopScroll(); startDraw(e, idx) }
+                    // 手先碰到（滚动中），接着笔落下：改成写字（或擦）
+                    mode == Mode.SCROLL && tool != Tool.MOVE && isStylus(e, idx) -> {
+                        stopScroll()
+                        if (erases(e, idx)) startErase(e, idx) else startDraw(e, idx)
+                    }
+                    // 没用过笔的设备上一根手指在擦，第二根手指落下：改成两指滚动
+                    mode == Mode.ERASE && !isStylus(e, e.findPointerIndex(drawPointer)) && !isStylus(e, idx) -> { endErase(); startScroll(e) }
                     // 没用过笔的设备上一根手指在写，第二根手指落下：改成两指滚动
                     mode == Mode.DRAW && !isStylus(e, e.findPointerIndex(drawPointer)) && !isStylus(e, idx) -> {
                         if (curN > 40) endStroke() else cancelDraw()   // 已经写了一长笔就留下
@@ -272,7 +305,15 @@ class NoteCanvas(
                     mode == Mode.SCROLL -> resetScrollBaseline(e)
                 }
             }
-            MotionEvent.ACTION_MOVE -> when (mode) {
+            MotionEvent.ACTION_MOVE -> { checkLongPressSlop(e); when (mode) {
+                Mode.ERASE -> {
+                    val idx = e.findPointerIndex(drawPointer)
+                    if (idx >= 0) {
+                        for (h in 0 until e.historySize) eraseTo(e.getHistoricalX(idx, h), e.getHistoricalY(idx, h))
+                        eraseTo(e.getX(idx), e.getY(idx))
+                        invalidate()
+                    }
+                }
                 Mode.DRAW -> {
                     val idx = e.findPointerIndex(drawPointer)
                     if (idx >= 0) {
@@ -290,14 +331,17 @@ class NoteCanvas(
                 }
                 Mode.DRAG -> dragTo(e.x, e.y)
                 Mode.NONE -> {}
-            }
+            } }
             MotionEvent.ACTION_POINTER_UP -> {
                 if (mode == Mode.DRAW && e.getPointerId(e.actionIndex) == drawPointer) endStroke()
+                else if (mode == Mode.ERASE && e.getPointerId(e.actionIndex) == drawPointer) endErase()
                 else if (mode == Mode.SCROLL) resetScrollBaseline(e, excluding = e.actionIndex)
             }
             MotionEvent.ACTION_UP -> {
+                cancelImagePress()
                 when (mode) {
                     Mode.DRAW -> endStroke()
+                    Mode.ERASE -> endErase()
                     Mode.SCROLL -> {
                         velocity?.addMovement(e)
                         velocity?.computeCurrentVelocity(1000)
@@ -312,8 +356,10 @@ class NoteCanvas(
                 velocity?.recycle(); velocity = null
             }
             MotionEvent.ACTION_CANCEL -> {
+                cancelImagePress()
                 when (mode) {
                     Mode.DRAW -> cancelDraw()
+                    Mode.ERASE -> endErase()
                     Mode.DRAG -> endDrag()
                     else -> {}
                 }
@@ -327,6 +373,124 @@ class NoteCanvas(
         if (idx < 0 || idx >= e.pointerCount) return false
         val t = e.getToolType(idx)
         return t == MotionEvent.TOOL_TYPE_STYLUS || t == MotionEvent.TOOL_TYPE_ERASER
+    }
+
+    /** 这一下是擦：选了橡皮擦，或者拿笔时用的是笔尾的橡皮头 / 按着笔上的按键。 */
+    private fun erases(e: MotionEvent, idx: Int): Boolean {
+        if (tool == Tool.ERASER) return true
+        if (tool != Tool.PEN || idx < 0 || idx >= e.pointerCount) return false
+        val t = e.getToolType(idx)
+        return t == MotionEvent.TOOL_TYPE_ERASER ||
+            (t == MotionEvent.TOOL_TYPE_STYLUS && (e.buttonState and MotionEvent.BUTTON_STYLUS_PRIMARY) != 0)
+    }
+
+    // ---------- 橡皮擦 ----------
+
+    private fun startErase(e: MotionEvent, idx: Int): Boolean {
+        val x = e.getX(idx); val y = e.getY(idx)
+        val pi = pageAt(x, y)
+        if (pi < 0) return false
+        mode = Mode.ERASE
+        drawPointer = e.getPointerId(idx)
+        drawPage = pi
+        eraseBefore = null
+        val p = toPage(pi, x, y)
+        eraseLast.set(p)
+        eraseView.set(x, y)
+        eraseSegment(p.x, p.y)
+        invalidate()
+        return true
+    }
+
+    private fun eraseTo(x: Float, y: Float) {
+        val p = toPage(drawPage, x, y)
+        eraseSegment(p.x, p.y)
+        eraseView.set(x, y)
+    }
+
+    /** 擦掉从上一个点到 (x, y) 这一段划过的笔迹。页面缓存图按版本号重画，不用每次新建。 */
+    private fun eraseSegment(x: Float, y: Float) {
+        val page = pages.getOrNull(drawPage) ?: return
+        val out = Eraser.erase(page.strokes, eraseLast.x, eraseLast.y, x, y, eraserSize)
+        eraseLast.set(x, y)
+        if (out == null) return
+        if (eraseBefore == null) eraseBefore = ArrayList(page.strokes)
+        page.strokes.clear(); page.strokes.addAll(out)
+        page.changed()
+    }
+
+    /** 这一下擦完：擦到了东西就记一步撤回。 */
+    private fun endErase() {
+        val page = pages.getOrNull(drawPage)
+        val before = eraseBefore
+        if (page != null && before != null) {
+            push(Op.ReplaceStrokes(page, before, ArrayList(page.strokes)))
+            onChanged()
+        }
+        eraseBefore = null
+        mode = Mode.NONE; drawPointer = -1
+        invalidate()
+    }
+
+    // ---------- 长按图片 ----------
+
+    /** 按在一张图片上就开始计时；挪远了、抬起了、第二根手指落下就取消。圈的时候不管。 */
+    private fun armLongPress(e: MotionEvent) {
+        cancelImagePress()
+        if (tool == Tool.CIRCLE || onImageLongPress == null) return
+        val pi = pageAt(e.x, e.y)
+        if (pi < 0) return
+        val pp = toPage(pi, e.x, e.y)
+        val img = pages[pi].images.lastOrNull { it.contains(pp.x, pp.y) } ?: return
+        pressImg = pi to img
+        pressDown.set(e.x, e.y)
+        postDelayed(longPress, LONG_PRESS_MS)
+    }
+
+    private fun checkLongPressSlop(e: MotionEvent) {
+        if (pressImg != null && hypot(e.getX(0) - pressDown.x, e.getY(0) - pressDown.y) > slop) cancelImagePress()
+    }
+
+    private fun cancelImagePress() {
+        if (pressImg == null) return
+        removeCallbacks(longPress)
+        pressImg = null
+    }
+
+    private fun fireLongPress() {
+        val (pi, img) = pressImg ?: return
+        pressImg = null
+        when (mode) {   // 这一下不算写字、擦、滚动或拖动
+            Mode.DRAW -> { curN = 0; drawPointer = -1 }
+            Mode.ERASE -> endErase()
+            Mode.SCROLL -> scroller.forceFinished(true)
+            Mode.DRAG -> {
+                dragging?.let { it.x = dragFrom.x; it.y = dragFrom.y }
+                dragging = null
+                selected?.first?.let { dropPageCache(it) }
+            }
+            Mode.NONE -> {}
+        }
+        mode = Mode.NONE
+        if (pi !in pages.indices || pages[pi].images.none { it === img }) { invalidate(); return }
+        pressed = pages[pi] to img
+        performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+        invalidate()
+        onImageLongPress?.invoke(pi, img, pressDown.x, pressDown.y)
+    }
+
+    /** 长按菜单关掉了：去掉虚线框。 */
+    fun clearPressed() { pressed = null; invalidate() }
+
+    /** 删掉一张图（长按菜单里的「删除图片」），可以撤回。 */
+    fun removeImage(pageIndex: Int, img: NoteImage) {
+        val page = pages.getOrNull(pageIndex) ?: return
+        if (!page.images.remove(img)) return
+        page.changed(); dropPageCache(page)
+        push(Op.RemoveImage(page, img))
+        if (selected?.second === img) selected = null
+        if (pressed?.second === img) pressed = null
+        invalidate(); onChanged()
     }
 
     /** 落点在某一页上才开始写，返回是否开始了。 */
@@ -531,6 +695,16 @@ class NoteCanvas(
                 canvas.drawLine(r.right - d, r.top + d, r.right + d, r.top - d, handleX)
             }
         }
+        // 长按着的图片
+        pressed?.let { (page, img) ->
+            val pi = pages.indexOf(page)
+            if (pi >= 0) {
+                val a = toView(pi, img.x, img.y)
+                canvas.drawRect(a.x, a.y, a.x + img.w * scale, a.y + img.h * scale, selectPaint)
+            }
+        }
+        // 橡皮
+        if (mode == Mode.ERASE) canvas.drawCircle(eraseView.x, eraseView.y, eraserSize * scale, eraserPaint)
         // 荧光圈
         if (circleStrokes.isNotEmpty() && circlePage in pages.indices) {
             canvas.save()
@@ -561,9 +735,12 @@ class NoteCanvas(
     }
 
     private fun pageBitmap(page: NotePage): Bitmap {
-        cache[page]?.let { c -> if (c.version == page.version) return c.bmp }
-        cache.remove(page)?.bmp?.recycle()
-        val bmp = Bitmap.createBitmap(max(1, pageWpx.toInt()), max(1, pageHpx.toInt()), Bitmap.Config.ARGB_8888)
+        val old = cache[page]
+        if (old != null && old.version == page.version) return old.bmp
+        val w = max(1, pageWpx.toInt()); val h = max(1, pageHpx.toInt())
+        // 尺寸没变就画在原来那张图上（橡皮擦的时候每一帧都会变，不用每次新建十几兆的图）
+        val bmp = if (old != null && !old.bmp.isRecycled && old.bmp.width == w && old.bmp.height == h) old.bmp
+        else { cache.remove(page)?.bmp?.recycle(); Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888) }
         drawPage(Canvas(bmp), page, scale, skip = dragging)
         cache[page] = Cached(bmp, page.version)
         return bmp
@@ -704,7 +881,77 @@ class NoteCanvas(
         const val HIGHLIGHT = 0x88FFB300.toInt()
         const val HIGHLIGHT_W = 9f
         const val CIRCLE_PAUSE_MS = 1000L
+        /** 橡皮擦三档半径（页面坐标，页宽 1000）。 */
+        val ERASER_SIZES = floatArrayOf(6f, 14f, 30f)
+        const val LONG_PRESS_MS = 600L
         const val GRID_W = 50
         const val GRID_H = 36
+    }
+}
+
+/** 橡皮擦：去掉笔迹里离橡皮划过的线段不到 r（再加半个笔宽）的部分，一笔被擦断就分成几笔。 */
+object Eraser {
+    /** 返回擦过以后的笔迹；什么都没擦到返回 null。 */
+    fun erase(strokes: List<Stroke>, ax: Float, ay: Float, bx: Float, by: Float, r: Float): List<Stroke>? {
+        var out: ArrayList<Stroke>? = null
+        for (i in strokes.indices) {
+            val s = strokes[i]
+            val rr = r + s.width / 2
+            val b = s.box
+            val far = max(ax, bx) + rr < b[0] || min(ax, bx) - rr > b[2] || max(ay, by) + rr < b[1] || min(ay, by) - rr > b[3]
+            val pieces = if (far) null else cut(s, ax, ay, bx, by, rr)
+            if (pieces == null) { out?.add(s); continue }
+            if (out == null) out = ArrayList<Stroke>(strokes.size + 4).also { o -> for (j in 0 until i) o.add(strokes[j]) }
+            out.addAll(pieces)
+        }
+        return out
+    }
+
+    /** 擦到了就返回剩下的几段（可能是空的），没擦到返回 null。 */
+    private fun cut(s: Stroke, ax: Float, ay: Float, bx: Float, by: Float, rr: Float): List<Stroke>? {
+        val pts = densify(s.pts, max(0.5f, rr / 2))
+        val n = pts.size / 2
+        val hit = BooleanArray(n)
+        var any = false
+        for (k in 0 until n) if (distToSegment(pts[2 * k], pts[2 * k + 1], ax, ay, bx, by) < rr) { hit[k] = true; any = true }
+        if (!any) return null
+        val out = ArrayList<Stroke>()
+        var start = -1
+        for (k in 0..n) {
+            val keep = k < n && !hit[k]
+            if (keep && start < 0) start = k
+            if (!keep && start >= 0) {
+                if (k - start >= 2) out.add(Stroke(s.color, s.width, pts.copyOfRange(2 * start, 2 * k)))   // 只剩一个点的碎渣不要
+                start = -1
+            }
+        }
+        return out
+    }
+
+    /** 相邻两点离得比 step 远就在中间补点，免得橡皮从两点之间划过却没擦到。 */
+    private fun densify(p: FloatArray, step: Float): FloatArray {
+        if (p.size < 4) return p
+        val out = ArrayList<Float>(p.size * 2)
+        var j = 0
+        while (j + 1 < p.size) {
+            out.add(p[j]); out.add(p[j + 1])
+            if (j + 3 < p.size) {
+                val dx = p[j + 2] - p[j]; val dy = p[j + 3] - p[j + 1]
+                val d = hypot(dx, dy)
+                if (d > step) {
+                    val m = kotlin.math.ceil(d / step).toInt()
+                    for (t in 1 until m) { out.add(p[j] + dx * t / m); out.add(p[j + 1] + dy * t / m) }
+                }
+            }
+            j += 2
+        }
+        return out.toFloatArray()
+    }
+
+    fun distToSegment(px: Float, py: Float, ax: Float, ay: Float, bx: Float, by: Float): Float {
+        val dx = bx - ax; val dy = by - ay
+        val l2 = dx * dx + dy * dy
+        val t = if (l2 <= 1e-6f) 0f else (((px - ax) * dx + (py - ay) * dy) / l2).coerceIn(0f, 1f)
+        return hypot(px - (ax + t * dx), py - (ay + t * dy))
     }
 }

@@ -4,7 +4,7 @@
     <string name="service_desc">显示「圈」「卡」悬浮条。只有在你点「圈」时才截取屏幕，让你圈出问题发给 AI。</string>
 
     <string name="lasso_hint">圈出你的问题</string>
-    <string name="lasso_sending">停笔 1 秒就发送；接着画可以补圈，圈完写 gg 讲根源、写 j 解题</string>
+    <string name="lasso_sending">停笔 1 秒就发送；接着画可以补圈%1$s</string>
     <string name="lasso_redo">重圈</string>
     <string name="lasso_cancel">取消</string>
 
@@ -80,7 +80,7 @@
     <string name="src_latest">最新截图</string>
     <string name="src_pick">相册</string>
     <string name="src_camera">拍照</string>
-    <string name="circle_hint">圈出你的问题，圈完写 gg 讲根源、写 j 解题；双指可以缩放。截了新图会自动换上。</string>
+    <string name="circle_hint">圈出你的问题%1$s；双指可以缩放。截了新图会自动换上。</string>
     <string name="circle_empty">点上面的按钮载入一张图：最新截图、截屏（只临时用，不存相册）、相册或粘贴；也可以把截图直接拖到这里。</string>
     <string name="latest_loaded">已载入最新截图</string>
     <string name="no_screenshot">没找到截图</string>
@@ -123,19 +123,48 @@
     <string name="note_undo">撤回</string>
     <string name="note_redo">还原</string>
     <string name="note_circle">圈题问 AI</string>
-    <string name="note_circle_hint">用荧光笔圈出问题，停笔 1 秒就发给 AI；圈完写 gg 讲根源、写 j 解题</string>
+    <string name="note_circle_hint">用荧光笔圈出问题，停笔 1 秒就发给 AI%1$s。每圈一次开一个回答框，点 × 才关。</string>
+    <string name="marks_hint">；圈完可以写记号换模式（%1$s）</string>
+    <string name="note_eraser">橡皮擦</string>
+    <string name="note_eraser_hint">橡皮擦：划过哪里就擦掉哪里，擦错了可以撤回。拿着橡皮时，左边三档粗细就是橡皮的大小。笔尾有橡皮头的话，翻过来也能直接擦。</string>
+    <string name="note_image_delete">删除图片</string>
+    <string name="note_image_deleted">图片已删除，点撤回可以恢复</string>
     <string name="note_move">移动图片</string>
-    <string name="note_move_hint">现在可以拖动纸上的图片；点图片右上角的 × 删掉它</string>
+    <string name="note_move_hint">现在可以拖动纸上的图片；点图片右上角的 × 删掉它。平时长按图片也能删除。</string>
     <string name="note_keep">留下</string>
     <string name="tip_ok">知道了</string>
     <string name="note_image">插入图片</string>
     <string name="note_image_gallery">从相册选</string>
     <string name="note_image_files">从文件选</string>
-    <string name="note_image_added">图片已贴到纸上，现在可以拖动它，点右上角的 × 删掉；摆好后点工具栏的「移动图片」回去写字。</string>
+    <string name="note_image_added">图片已贴到纸上，现在可以拖动它，点右上角的 × 删掉；摆好后点工具栏的「移动图片」回去写字。以后长按图片也能删除。</string>
     <string name="tip_never">不再提示</string>
-    <string name="note_kept">已贴到纸上。要挪动它，先点工具栏里的「移动图片」。</string>
+    <string name="note_kept">已贴到纸上。要挪动它，先点工具栏里的「移动图片」；长按它可以删除。</string>
     <string name="note_keep_failed">没能留下这条回答，把回答框挪到屏幕里再试一次。</string>
     <string name="note_session">会话：%1$s ▾</string>
+
+    <string name="sec_marks">模式记号</string>
+    <string name="marks_now">圈完在圈外写几个字母，这一次就换一种回答方式。现在设的：%1$s</string>
+    <string name="marks_now_none">圈完在圈外写几个字母，这一次就换一种回答方式。现在一个记号都没设。</string>
+    <string name="marks_open">设置模式记号</string>
+    <string name="marks_title">模式记号</string>
+    <string name="marks_help">圈完一道题，在圈外手写下面某个记号的字母，这一次就按它的提示词回答。记号其实就是一段提前写好的提示词：AI 认出你写的字母，就照这段话来答。\n· 字母 1 到 3 个，只能用英文字母，不分大小写。\n· 名称会显示在回答的类型标签上。\n· 提示词可以只写个大概，再点「AI 优化」，让 AI 改写成适合圈问的样子；不满意可以点「还原」。\n· 离开这一页时自动保存。</string>
+    <string name="marks_letters">字母</string>
+    <string name="marks_name">名称</string>
+    <string name="marks_name_hint">比如：根源</string>
+    <string name="marks_prompt">提示词</string>
+    <string name="marks_prompt_hint">这个模式要 AI 怎么回答，比如：用生活里的例子讲清楚这个概念</string>
+    <string name="marks_optimize">AI 优化</string>
+    <string name="marks_optimizing">优化中…</string>
+    <string name="marks_restore">还原</string>
+    <string name="marks_add">＋ 新增记号</string>
+    <string name="marks_reset">恢复默认</string>
+    <string name="marks_reset_confirm">恢复成默认的 gg 根源、j 解题？你改过和新加的记号都会去掉。</string>
+    <string name="marks_err_letters">字母写 1 到 3 个英文字母</string>
+    <string name="marks_err_dup">和别的记号重复了：%1$s</string>
+    <string name="marks_err_prompt">提示词还空着（可以只写个大概，再点「AI 优化」）</string>
+    <string name="marks_skipped">有 %1$d 个记号没填完整或者字母重复，没有保存。</string>
+    <string name="marks_need_draft">先写个大概，或者起个名字，再点「AI 优化」。</string>
+    <string name="marks_optimize_failed">优化失败：</string>
 
     <string name="sec_update">更新</string>
     <string name="version_now">当前版本 %1$s（第 %2$d 版）</string>

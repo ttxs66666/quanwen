@@ -41,23 +41,98 @@ object Prompts {
 
     fun prevPageLabel(lang: String) = if (lang == "en") "Previous page:" else "上一页："
 
-    /** 圈完写了模式记号：gg 根源模式，j 解题模式。最后一张图只有记号。 */
-    fun markText(lang: String) = if (lang == "en") MARK_EN else MARK_ZH
+    /** 圈完写了模式记号：列出他设的记号（[Marks]），每个记号就是一段提示词。最后一张图只有记号。 */
+    fun markText(lang: String, modes: List<MarkMode>): String {
+        val sb = StringBuilder()
+        if (lang == "en") {
+            sb.append("After circling, they handwrote a mode mark next to the circle (the image below shows only the mark; it is English letters, case does not matter). Their marks:\n")
+            for (m in modes) {
+                val mode = if (m.name.endsWith("mode", ignoreCase = true)) m.name else m.name + " mode"
+                sb.append("- \"").append(m.letters).append("\", ").append(mode).append(": ").append(sentence(m.prompt, en = true))
+                    .append(" Write \"").append(m.name).append("\" on the Type line.\n")
+            }
+            sb.append("They asked for these modes on purpose, so the restraint rule does not apply. If you cannot read the mark, or it is none of these, answer the normal way.")
+        } else {
+            sb.append("他圈完以后在旁边手写了一个模式记号（下面这张图里只有这个记号，是英文字母，不分大小写）。他设的记号：\n")
+            for (m in modes) {
+                val mode = if (m.name.endsWith("模式")) m.name else m.name + "模式"
+                sb.append("- 「").append(m.letters).append("」，").append(mode).append("：").append(sentence(m.prompt, en = false))
+                    .append("类型行写「").append(m.name).append("」。\n")
+            }
+            sb.append("这些模式是他主动要的，不受「适度」的限制。认不出记号，或者写的不是上面这几个，就按普通方式回答。")
+        }
+        return sb.toString()
+    }
 
-    private val MARK_ZH = """
-他圈完以后在旁边写了一个模式记号（下面这张图里只有这个记号）：
-- gg：根源模式。从这个知识最根本的地方讲起：它要解决什么问题、建立在哪些更基本的概念上、为什么会是这样，一层层讲回到他圈的内容。重在讲清思想和来龙去脉，不堆细节，正文不超过 10 句（公式另算）。类型行写「根源」。
-- j：解题模式。把这道题完整解出来并讲懂：先用一句话说思路，再用编号步骤解，关键步骤说明为什么这样做，最后写出答案。类型行写「解题」。
-这两种模式是他主动要的，不受「适度」的限制。认不出记号，或者写的不是这两个，就按普通方式回答。
+    /** 用户写的提示词：多行的缩进一下，末尾补上句号，好接后面那句。 */
+    private fun sentence(p: String, en: Boolean): String {
+        val t = p.trim().replace("\n", "\n  ")
+        val end = t.lastOrNull() ?: return t
+        return if (end in ".!?。！？）)」\"") t else t + if (en) "." else "。"
+    }
+
+    /** 「AI 优化」：把用户的模式提示词草稿改写成适合圈问的样子。返回 (instructions, input)。 */
+    fun optimizeMark(lang: String, letters: String, name: String, draft: String): Pair<String, String> =
+        if (lang == "en") OPTIMIZE_EN to "Mark: $letters\nMode name: $name\nDraft:\n$draft"
+        else OPTIMIZE_ZH to "记号：$letters\n模式名称：$name\n草稿：\n$draft"
+
+    /** 去掉模型偶尔加上的代码块、引号、「提示词：」之类的开头。 */
+    fun cleanOptimized(raw: String): String {
+        var t = raw.trim()
+        if (t.startsWith("```")) t = t.substringAfter('\n', "").substringBeforeLast("```").trim()
+        t = t.removePrefix("提示词：").removePrefix("Prompt:").trim()
+        val pairs = listOf("「" to "」", "\"" to "\"", "“" to "”")
+        for ((o, c) in pairs) if (t.length > 2 && t.startsWith(o) && t.endsWith(c)) t = t.substring(o.length, t.length - c.length).trim()
+        return t.take(Marks.MAX_PROMPT)
+    }
+
+    private val OPTIMIZE_ZH = """
+你在帮「圈问」的用户改写一段「模式提示词」。只输出改写后的提示词本身，不要解释，不要加标题、引号或代码块。
+
+圈问是怎么用的：
+- 他在平板上手写学习（App 自带的笔记本，或者截屏的任意页面），遇到问题就用笔把它圈出来。
+- AI 收到整页图和圈内放大图，回答显示在圈旁边的一个小框里（大约 400dp 宽，能显示 Markdown 和 LaTeX 公式）。
+- 他没有按钮可点，想追问就在纸上接着写、再圈一次；同一个会话里前面的问答 AI 都看得到。
+
+AI 平时的规矩（已经写在系统提示词里，你不用重复）：
+- 把圈的内容分成提问、判断、推一步三类，守「适度」：只给此刻需要的那一点，让他自己接着想。
+- 第一次回答先写「类型」「题目」两行和分隔线，再写正文。这个格式由 App 处理。
+- 公式用 LaTeX；不寒暄、不总结。
+
+模式记号：他圈完在圈外手写几个英文字母，这一次就进入对应的模式。AI 会同时收到这段模式提示词，按它回答这一题。模式是他主动要的，可以不受「适度」的限制。类型行会自动写成模式的名字。
+
+改写要求：
+- 保留他的意图，不加他没要的东西；草稿含糊时选最合理的理解。草稿是空的，就按模式名称写一段。
+- 写成给 AI 的直接指令：这个模式要做什么、按什么顺序讲、讲到什么程度为止、篇幅多长（用句数或行数说清楚）。
+- 要适合显示在圈旁边的小框里：篇幅有上限，用短段落或编号步骤。
+- 不写输出格式（类型、题目、分隔线），不写「类型行写……」，不提记号本身，不重复上面的规矩，不寒暄。
+- 不超过 150 字。
+- 用草稿的语言写；草稿是空的就用中文。
 """.trim()
 
-    private val MARK_EN = """
-After circling, they wrote a mode mark next to the circle (the image below shows only the mark):
-- gg: Roots mode. Start from the deepest root of this knowledge: what problem it solves, which more basic ideas it rests on, why it is the way it is, and work back up to what they circled. Focus on the idea and where it comes from, not on details; at most 10 sentences of body text (formulas aside). Write "Roots" on the Type line.
-- j: Solve mode. Solve the problem completely and make it understood: one sentence on the approach, then numbered steps, saying why at the key steps, and finally the answer. Write "Solve" on the Type line.
-They asked for these modes on purpose, so the restraint rule does not apply. If you cannot read the mark, or it is neither of these, answer the normal way.
-""".trim()
+    private val OPTIMIZE_EN = """
+You are helping a user of Quanwen rewrite a "mode prompt". Output only the rewritten prompt itself: no explanation, no heading, no quotes, no code block.
 
+How Quanwen is used:
+- They study by handwriting on a tablet (in the app's own notebook, or on any screen they capture) and circle whatever they are stuck on.
+- The AI gets the whole page and a zoomed view of the circle; its answer appears in a small box next to the circle (about 400dp wide, rendering Markdown and LaTeX).
+- There are no buttons: to follow up they keep writing on the page and circle again; the AI sees the earlier exchanges in the same session.
+
+The AI's usual rules (already in the system prompt, do not repeat them):
+- It sorts the circled content into Question, Check or Nudge and shows restraint: only the bit they need right now, so they keep thinking.
+- The first answer starts with a Type line, a Topic line and a separator, then the body. The app handles this format.
+- Math in LaTeX; no greetings, no summaries.
+
+Mode marks: after circling, they handwrite a few English letters outside the circle to switch to a mode for this one question. The AI then also receives this mode prompt and answers by it. They asked for the mode on purpose, so it may set the restraint rule aside. The Type line is set to the mode name automatically.
+
+How to rewrite:
+- Keep their intent and add nothing they did not ask for; if the draft is vague, pick the most reasonable reading. If the draft is empty, write one from the mode name.
+- Write direct instructions to the AI: what this mode does, in what order, how far to go, and how long (in sentences or lines).
+- It must fit the small box next to the circle: cap the length, use short paragraphs or numbered steps.
+- Do not describe the output format (Type, Topic, separator), do not say what to write on the Type line, do not mention the mark itself, do not repeat the rules above, no greetings.
+- At most 100 words.
+- Write in the draft's language; English if the draft is empty.
+""".trim()
 
     fun zoomLabel(lang: String) = if (lang == "en") "Zoomed view of the circled area:" else "圈内放大图："
 
@@ -99,7 +174,7 @@ They asked for these modes on purpose, so the restraint rule does not apply. If 
 - 用中文回答。
 
 第一次回答一道圈出的题时，严格按这个格式输出：
-类型：提问 / 判断 / 推一步（三选一；他写了模式记号时按记号写「根源」或「解题」）
+类型：提问 / 判断 / 推一步（三选一；他写了模式记号时，写那个模式的名字）
 题目：用一句话转写圈内的问题或思路，不超过 40 字，纯文字，不用 LaTeX
 ---
 回答正文
@@ -127,7 +202,7 @@ Rules:
 - Answer in English.
 
 For the first answer to a circled question, output exactly this format:
-Type: Question / Check / Nudge (pick one; if they wrote a mode mark, write Roots or Solve as the mark says)
+Type: Question / Check / Nudge (pick one; if they wrote a mode mark, write that mode's name)
 Topic: one-line transcription of the circled question or idea, at most 15 words, plain text without LaTeX
 ---
 answer body

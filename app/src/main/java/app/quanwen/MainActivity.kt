@@ -17,7 +17,7 @@ import android.widget.TextView
 import android.widget.Toast
 import org.json.JSONObject
 
-/** 设置页：开悬浮条（悬浮窗或无障碍）、科目、语言、模型、历史记录入口。 */
+/** 设置页：笔记本、开悬浮条（悬浮窗或无障碍）、模式记号、语言、模型、历史记录入口。 */
 class MainActivity : Activity() {
     private lateinit var prefs: Prefs
     private lateinit var col: LinearLayout
@@ -29,6 +29,7 @@ class MainActivity : Activity() {
     private lateinit var baseUrl: EditText
     private lateinit var apiKey: EditText
     private lateinit var testResult: TextView
+    private lateinit var marksText: TextView
     private lateinit var updateBtn: TextView
     private lateinit var updateText: TextView
     private var pendingUpdate: Updater.Info? = null
@@ -53,6 +54,8 @@ class MainActivity : Activity() {
         if (canFloat && (wantFloat || prefs.floatMode)) startFloat()
         wantFloat = false
         updateStatus()
+        val marks = Marks.summary(prefs)
+        marksText.text = if (marks.isEmpty()) getString(R.string.marks_now_none) else getString(R.string.marks_now, marks)
     }
 
     // ---------- 悬浮窗方式 ----------
@@ -162,7 +165,7 @@ class MainActivity : Activity() {
         val w = minOf(resources.displayMetrics.widthPixels, dpi(640f))
         outer.addView(col, LinearLayout.LayoutParams(w, ViewGroup.LayoutParams.WRAP_CONTENT))
         scroll.addView(outer)
-        setContentView(scroll)
+        setContentView(imeAware(scroll))
 
         col.addView(text(getString(R.string.app_name), 30f, Colors.INK, bold = true))
         col.addView(text(getString(R.string.main_tagline), 15f, Colors.MUTED).apply { setPadding(0, dpi(4f), 0, dpi(12f)) })
@@ -216,6 +219,12 @@ class MainActivity : Activity() {
             },
             button(getString(R.string.history)) { startActivity(Intent(this, HistoryActivity::class.java)) },
         ))
+
+        // 模式记号
+        section(getString(R.string.sec_marks))
+        marksText = text("", 13f, Colors.MUTED)
+        col.addView(marksText)
+        col.addView(row(button(getString(R.string.marks_open)) { startActivity(Intent(this, MarksActivity::class.java)) }))
 
         // 语言
         section(getString(R.string.sec_lang))

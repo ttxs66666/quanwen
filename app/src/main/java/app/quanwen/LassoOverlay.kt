@@ -163,7 +163,7 @@ class LassoOverlay(
                     }
                     current = null
                     if (strokes.isNotEmpty()) {
-                        hint.text = svc.str(R.string.lasso_sending)
+                        hint.text = svc.str(R.string.lasso_sending, Marks.hint(svc))
                         postDelayed(sendNow, SEND_DELAY_MS)
                     }
                 }

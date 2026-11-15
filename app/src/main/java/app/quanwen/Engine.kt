@@ -56,7 +56,8 @@ object Engine {
         val qa = store.create("", prefs.lang)
         qa.origin = origin
         qa.book = book
-        val (circle, marks) = ImageUtil.splitMarks(strokes)   // 圈完写的 gg / j 是模式记号，不算圈
+        // 圈完写的模式记号（gg、j 或用户自己设的）不算圈；一个记号都没设时，小笔画也算圈
+        val (circle, marks) = if (Marks.load(prefs).isEmpty()) strokes to emptyList() else ImageUtil.splitMarks(strokes)
         if (screenBounds != null) qa.bounds = screenBounds
         val turn = Turn(Turn.KIND_FIRST)
         qa.turns.add(turn)
@@ -140,8 +141,9 @@ object Engine {
         if (prev != null) content
             .put(JSONObject().put("type", "input_text").put("text", Prompts.prevPageLabel(qa.lang)))
             .put(image(prev))
-        if (mark != null) content   // 根源模式（gg）/ 解题模式（j）
-            .put(JSONObject().put("type", "input_text").put("text", Prompts.markText(qa.lang)))
+        val modes = Marks.load(prefs)
+        if (mark != null && modes.isNotEmpty()) content   // 模式记号：每个记号是一段用户设好的提示词
+            .put(JSONObject().put("type", "input_text").put("text", Prompts.markText(qa.lang, modes)))
             .put(image(mark))
         val body = baseBody(qa.lang)
             .put("input", JSONArray().put(JSONObject().put("role", "user").put("content", content)))

@@ -39,8 +39,9 @@ import kotlin.math.roundToInt
  * 工具栏：返回、撤回、还原、三档粗细、黑红蓝三色、圈、移动图片、会话下拉。
  *
  * 圈：用荧光笔圈出问题，停笔 1 秒发给 AI。AI 看到圈所在的整页、圈内放大图，圈在页面上部时再加上一页。
- * 回答框只有一个框：摆在圈的附近、相对稀疏的地方，避开右手放的位置；可以拖标题栏挪开。
- * 「留下」把回答变成一张图贴在纸上。每 3 秒把改过的页存一次，离开页面时马上存。
+ * 每圈一次开一个回答框：摆在圈的附近、相对稀疏的地方，避开右手放的位置和已经开着的框；可以拖标题栏挪开。
+ * 框不会自己关，点 × 才关；关掉之前一直贴在纸上，下次打开笔记本还在。
+ * 「留下」把回答变成一张图贴在纸上。长按图片可以删除。每 3 秒把改过的页存一次，离开页面时马上存。
  */
 class NoteActivity : Activity() {
     private lateinit var prefs: Prefs
@@ -52,6 +53,7 @@ class NoteActivity : Activity() {
     private lateinit var redoBtn: ToolIcon
     private lateinit var circleBtn: ToolIcon
     private lateinit var moveBtn: ToolIcon
+    private lateinit var eraserBtn: ToolIcon
     private lateinit var sessionBtn: TextView
     private val widthBtns = ArrayList<ToolIcon>()
     private val colorBtns = ArrayList<ToolIcon>()
@@ -61,14 +63,12 @@ class NoteActivity : Activity() {
         override fun run() { saveDirty(); main.postDelayed(this, SAVE_EVERY_MS) }
     }
 
-    // 回答框：贴在某一页的某个位置（页面坐标），随纸张滚动
-    private var popup: AnswerView? = null
-    private var popupQa: Qa? = null
-    private var popupPage = -1
-    private val popupAt = PointF()
+    /** 一个回答框：哪道题、贴在第几页的哪个位置（左上角，页面坐标），随纸张滚动。 */
+    private class Pop(val view: AnswerView, val qa: Qa, val page: Int, val at: PointF)
+    private val pops = ArrayList<Pop>()
 
     private val onQaChanged: (Qa, Boolean) -> Unit = { qa, _ ->
-        if (qa === popupQa) popup?.refresh(qa)
+        for (p in pops) if (p.qa === qa) p.view.refresh(qa)
         refreshSession()
     }
 
@@ -85,9 +85,11 @@ class NoteActivity : Activity() {
         canvas = NoteCanvas(this, book, pages) { refreshButtons() }
         canvas.penColor = NotePaper.COLORS[prefs.noteColor.coerceIn(0, 2)]
         canvas.penWidth = NotePaper.WIDTHS[prefs.noteWidth.coerceIn(0, 2)]
+        canvas.eraserSize = NoteCanvas.ERASER_SIZES[prefs.noteEraser.coerceIn(0, 2)]
         canvas.onToolChanged = { refreshButtons() }
         canvas.onCircle = { pi, strokes -> askAbout(pi, strokes) }
-        canvas.onViewport = { placePopupView() }
+        canvas.onViewport = { placePops() }
+        canvas.onImageLongPress = { pi, img, x, y -> imageMenu(pi, img, x, y) }
 
         window.statusBarColor = TOOLBAR
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
@@ -100,6 +102,7 @@ class NoteActivity : Activity() {
         setContentView(root)
         Engine.addListener(onQaChanged)
         refreshButtons()
+        layer.post { restorePops() }   // 等量好尺寸再摆
     }
 
     override fun onResume() {
@@ -118,7 +121,8 @@ class NoteActivity : Activity() {
 
     override fun onDestroy() {
         Engine.removeListener(onQaChanged)
-        closePopup()
+        for (p in pops) p.view.destroy()   // 只是不显示了；没关的框记在文件里，下次打开还在
+        pops.clear()
         if (::canvas.isInitialized) canvas.clearCache()
         io.shutdown()   // 已经排队的保存会做完
         super.onDestroy()
@@ -153,73 +157,106 @@ class NoteActivity : Activity() {
         showPopup(qa, pi, b)
     }
 
+    /** 新圈的题新开一个回答框，摆在圈附近、避开已经开着的框。以前的框不会自己关，点 × 才关。 */
     private fun showPopup(qa: Qa, pi: Int, circle: RectF) {
-        closePopup()
+        val w = popupWidth()
+        val minH = dpi(210f)
+        val avoid = pops.map { RectF(it.view.x, it.view.y, it.view.x + max(it.view.width, w), it.view.y + max(it.view.height, minH)) }
+        val at = PopupPlacer.place(canvas, pi, circle, w.toFloat(), minH.toFloat(), layer.width.toFloat(), layer.height.toFloat(), dp(1f), avoid)
+        addPop(qa, pi, at, w)
+        savePops()
+    }
+
+    private fun addPop(qa: Qa, pi: Int, at: PointF, w: Int = popupWidth()): Pop {
+        var pop: Pop? = null
         val v = AnswerView(this, fill = false,
             maxBodyHeight = { (layer.height * 0.42f).toInt() },
-            onClose = { closePopup() },
-            onResized = { placePopupView() },
+            onClose = { pop?.let { closePop(it) } },
+            onResized = { placePops() },
             minimal = true,
             extraLabel = { getString(R.string.note_keep) },
-            onExtra = { keepPopup() })
-        val w = popupWidth()
+            onExtra = { pop?.let { keepPopup(it) } })
         layer.addView(v, FrameLayout.LayoutParams(w, ViewGroup.LayoutParams.WRAP_CONTENT))
         v.elevation = dp(6f)
-        popup = v; popupQa = qa; popupPage = pi
-        val at = PopupPlacer.place(canvas, pi, circle, w.toFloat(), dp(210f), layer.width.toFloat(), layer.height.toFloat(), dp(1f))
-        popupAt.set(at)
-        dragByHeader(v)
+        val p = Pop(v, qa, pi, PointF(at.x, at.y))
+        pop = p
+        pops.add(p)
+        dragByHeader(p)
         v.showQa(qa)
-        placePopupView()
+        placePops()
+        tip?.bringToFront()
+        return p
     }
+
+    /** 打开笔记本时把上次没关的回答框放回原处（题在历史里删了、页不在了的就不要了）。 */
+    private fun restorePops() {
+        val saved = NoteStore.loadPops(book)
+        if (saved.isEmpty()) return
+        for (s in saved) {
+            val qa = Engine.store.list.firstOrNull { it.id == s.qaId } ?: continue
+            val pi = pages.indexOfFirst { it.id == s.pageId }
+            if (pi < 0) continue
+            addPop(qa, pi, PointF(s.x, s.y))
+        }
+        if (pops.size != saved.size) savePops()
+    }
+
+    private fun savePops() =
+        NoteStore.savePops(book, pops.filter { it.page in pages.indices }.map { OpenPop(it.qa.id, pages[it.page].id, it.at.x, it.at.y) })
 
     private fun popupWidth() = (layer.width * 0.42f).roundToInt().coerceIn(dpi(300f), max(dpi(300f), min(dpi(460f), layer.width - dpi(32f))))
 
-    private fun placePopupView() {
-        val v = popup ?: return
-        if (popupPage !in 0 until canvas.pageCount()) return
-        val p = canvas.toView(popupPage, popupAt.x, popupAt.y)
-        v.x = p.x; v.y = p.y
+    /** 回答框贴着纸：滚动、转屏后按页面坐标重新摆。 */
+    private fun placePops() {
+        for (p in pops) {
+            if (p.page !in 0 until canvas.pageCount()) continue
+            val pt = canvas.toView(p.page, p.at.x, p.at.y)
+            p.view.x = pt.x; p.view.y = pt.y
+        }
     }
 
-    private fun closePopup() {
-        val v = popup ?: return
-        layer.removeView(v)
-        v.destroy()
-        popup = null; popupQa = null; popupPage = -1
+    private fun closePop(p: Pop) {
+        if (!pops.remove(p)) return
+        layer.removeView(p.view)
+        p.view.destroy()
+        savePops()
     }
 
-    /** 拖标题栏挪开回答框（位置记在页面坐标里，滚动时跟着纸走）。 */
+    /** 拖标题栏挪开回答框（位置记在页面坐标里，滚动时跟着纸走）。按住的框放到最上面。 */
     @SuppressLint("ClickableViewAccessibility")
-    private fun dragByHeader(v: AnswerView) {
+    private fun dragByHeader(p: Pop) {
+        val v = p.view
         var downX = 0f; var downY = 0f; var startX = 0f; var startY = 0f; var moved = false
         v.header.setOnTouchListener { _, e ->
             when (e.actionMasked) {
-                MotionEvent.ACTION_DOWN -> { downX = e.rawX; downY = e.rawY; startX = v.x; startY = v.y; moved = false; true }
+                MotionEvent.ACTION_DOWN -> {
+                    downX = e.rawX; downY = e.rawY; startX = v.x; startY = v.y; moved = false
+                    v.bringToFront(); tip?.bringToFront()
+                    true
+                }
                 MotionEvent.ACTION_MOVE -> {
                     val dx = e.rawX - downX; val dy = e.rawY - downY
                     if (moved || abs(dx) + abs(dy) > dp(6f)) {
                         moved = true
                         val nx = (startX + dx).coerceIn(0f, max(0f, layer.width - v.width.toFloat()))
                         val ny = (startY + dy).coerceIn(-v.height / 2f, layer.height - dp(40f))
-                        val pp = canvas.toPage(popupPage, nx, ny)
-                        popupAt.set(pp)
-                        placePopupView()
+                        p.at.set(canvas.toPage(p.page, nx, ny))
+                        placePops()
                     }
                     true
                 }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> { if (moved) savePops(); moved }
                 else -> moved
             }
         }
     }
 
-    /** 「留下」：把回答正文截成一张图，贴在回答框所在的位置。 */
-    private fun keepPopup() {
-        val v = popup ?: return
-        val pi = popupPage
+    /** 「留下」：把回答正文截成一张图，贴在回答框所在的位置，然后关掉这个框。 */
+    private fun keepPopup(p: Pop) {
+        val v = p.view
+        val pi = p.page
         val body = v.body
         val loc = IntArray(2); body.getLocationInWindow(loc)
-        val win = Rect(); window.decorView.getWindowVisibleDisplayFrame(win)
         val src = Rect(loc[0], loc[1], loc[0] + body.width, loc[1] + body.height)
         if (!src.intersect(0, 0, window.decorView.width, window.decorView.height) || src.width() < 8 || src.height() < 8) {
             Toast.makeText(this, R.string.note_keep_failed, Toast.LENGTH_SHORT).show(); return
@@ -245,12 +282,37 @@ class NoteActivity : Activity() {
             card.recycle()
             if (w > NotePaper.PAGE_W) { h *= NotePaper.PAGE_W / w; w = NotePaper.PAGE_W }
             if (h > NotePaper.PAGE_H) { w *= NotePaper.PAGE_H / h; h = NotePaper.PAGE_H }
-            val x = (popupAt.x - pad / canvas.scale).coerceIn(0f, NotePaper.PAGE_W - w)
-            val y = (popupAt.y + (bodyTopInPopup - pad) / canvas.scale).coerceIn(0f, NotePaper.PAGE_H - h)
+            val x = (p.at.x - pad / canvas.scale).coerceIn(0f, NotePaper.PAGE_W - w)
+            val y = (p.at.y + (bodyTopInPopup - pad) / canvas.scale).coerceIn(0f, NotePaper.PAGE_H - h)
             canvas.addImage(pi, NoteImage(id, x, y, w, h))
-            closePopup()
+            closePop(p)
             showTip("kept", R.string.note_kept)
         }, main)
+    }
+
+    // ---------- 长按图片 ----------
+
+    /** 长按一张图片：删除它，或者切到「移动图片」拖它。 */
+    private fun imageMenu(pi: Int, img: NoteImage, x: Float, y: Float) {
+        val anchor = View(this)
+        layer.addView(anchor, FrameLayout.LayoutParams(1, 1).apply { leftMargin = x.roundToInt(); topMargin = y.roundToInt() })
+        anchor.post {
+            val menu = PopupMenu(this, anchor)
+            menu.menu.add(0, 1, 0, R.string.note_image_delete)
+            menu.menu.add(0, 2, 1, R.string.note_move)
+            menu.setOnMenuItemClickListener { item ->
+                if (item.itemId == 1) {
+                    canvas.removeImage(pi, img)
+                    Toast.makeText(this, R.string.note_image_deleted, Toast.LENGTH_SHORT).show()
+                } else {
+                    canvas.tool = NoteCanvas.Tool.MOVE
+                    canvas.selectImage(pi, img)
+                }
+                true
+            }
+            menu.setOnDismissListener { layer.removeView(anchor); canvas.clearPressed() }
+            menu.show()
+        }
     }
 
     // ---------- 插入图片 ----------
@@ -313,7 +375,9 @@ class NoteActivity : Activity() {
      * 画布顶上的一张小提示卡，不挡写字，12 秒后自己消失。
      * 「知道了」只关这一次；「不再提示」以后都不显示（以前每次都弹 Toast，很烦）。
      */
-    private fun showTip(key: String, text: Int) {
+    private fun showTip(key: String, text: Int) = showTip(key, getString(text))
+
+    private fun showTip(key: String, text: String) {
         if (prefs.tipOff(key)) return
         main.removeCallbacks(hideTip); hideTip.run()
         val card = LinearLayout(this).apply {
@@ -322,7 +386,7 @@ class NoteActivity : Activity() {
             setPadding(dpi(16f), dpi(12f), dpi(8f), dpi(4f))
             elevation = dp(8f)
         }
-        card.addView(TextView(this).apply { this.text = getString(text); textSize = 14f; setTextColor(0xFFFFFFFF.toInt()) })
+        card.addView(TextView(this).apply { this.text = text; textSize = 14f; setTextColor(0xFFFFFFFF.toInt()) })
         val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.END }
         row.addView(tipButton(getString(R.string.tip_never)) { prefs.turnTipOff(key); main.removeCallbacks(hideTip); hideTip.run() })
         row.addView(tipButton(getString(R.string.tip_ok)) { main.removeCallbacks(hideTip); hideTip.run() })
@@ -358,7 +422,12 @@ class NoteActivity : Activity() {
         bar.addView(divider())
         for (i in 0..2) {
             val b = icon(ToolIcon.WIDTH, i) {
-                prefs.noteWidth = i; canvas.penWidth = NotePaper.WIDTHS[i]; canvas.tool = NoteCanvas.Tool.PEN; refreshButtons()
+                if (canvas.tool == NoteCanvas.Tool.ERASER) {   // 拿着橡皮时，三档粗细就是橡皮的大小
+                    prefs.noteEraser = i; canvas.eraserSize = NoteCanvas.ERASER_SIZES[i]
+                } else {
+                    prefs.noteWidth = i; canvas.penWidth = NotePaper.WIDTHS[i]; canvas.tool = NoteCanvas.Tool.PEN
+                }
+                refreshButtons()
             }
             widthBtns.add(b); bar.addView(b)
         }
@@ -370,9 +439,15 @@ class NoteActivity : Activity() {
             colorBtns.add(b); bar.addView(b)
         }
         bar.addView(divider())
+        eraserBtn = icon(ToolIcon.ERASER) {
+            if (canvas.tool == NoteCanvas.Tool.ERASER) canvas.tool = NoteCanvas.Tool.PEN
+            else { canvas.tool = NoteCanvas.Tool.ERASER; showTip("eraser", R.string.note_eraser_hint) }
+        }.apply { contentDescription = getString(R.string.note_eraser) }
+        bar.addView(eraserBtn)
+        bar.addView(divider())
         circleBtn = icon(ToolIcon.CIRCLE) {
             if (canvas.tool == NoteCanvas.Tool.CIRCLE) canvas.tool = NoteCanvas.Tool.PEN
-            else { canvas.tool = NoteCanvas.Tool.CIRCLE; showTip("circle", R.string.note_circle_hint) }
+            else { canvas.tool = NoteCanvas.Tool.CIRCLE; showTip("circle", getString(R.string.note_circle_hint, Marks.hint(this))) }
         }.apply { contentDescription = getString(R.string.note_circle) }
         moveBtn = icon(ToolIcon.MOVE) {
             if (canvas.tool == NoteCanvas.Tool.MOVE) canvas.tool = NoteCanvas.Tool.PEN
@@ -395,7 +470,11 @@ class NoteActivity : Activity() {
         undoBtn.isEnabled = canvas.canUndo; undoBtn.alpha = if (canvas.canUndo) 1f else 0.3f
         redoBtn.isEnabled = canvas.canRedo; redoBtn.alpha = if (canvas.canRedo) 1f else 0.3f
         val pen = canvas.tool == NoteCanvas.Tool.PEN
-        widthBtns.forEachIndexed { i, b -> b.on = pen && NotePaper.WIDTHS[i] == canvas.penWidth }
+        val eraser = canvas.tool == NoteCanvas.Tool.ERASER
+        widthBtns.forEachIndexed { i, b ->
+            b.on = (pen && NotePaper.WIDTHS[i] == canvas.penWidth) || (eraser && NoteCanvas.ERASER_SIZES[i] == canvas.eraserSize)
+        }
+        eraserBtn.on = eraser
         colorBtns.forEachIndexed { i, b -> b.on = NotePaper.COLORS[i] == canvas.penColor }
         circleBtn.on = canvas.tool == NoteCanvas.Tool.CIRCLE
         moveBtn.on = canvas.tool == NoteCanvas.Tool.MOVE
@@ -460,7 +539,9 @@ class NoteActivity : Activity() {
  */
 object PopupPlacer {
     /** 返回回答框左上角的页面坐标。w、h、viewW、viewH、unit（1dp）都是像素。 */
-    fun place(cv: NoteCanvas, pi: Int, circle: RectF, w: Float, h: Float, viewW: Float, viewH: Float, unit: Float): PointF {
+    fun place(cv: NoteCanvas, pi: Int, circle: RectF, w: Float, h: Float, viewW: Float, viewH: Float, unit: Float,
+              /** 已经开着的回答框（画布坐标），尽量不盖住它们。 */
+              avoid: List<RectF> = emptyList()): PointF {
         val a = cv.toView(pi, circle.left, circle.top)
         val b = cv.toView(pi, circle.right, circle.bottom)
         val c = RectF(a.x, a.y, b.x, b.y)
@@ -475,6 +556,8 @@ object PopupPlacer {
             PointF(c.right + g, c.top - h * 0.85f),        // 右边偏上
             PointF(c.left - w, c.bottom + g),              // 左下
             PointF(c.centerX() - w / 2, c.bottom + g),     // 下
+            PointF(c.left - g - w, c.top - g - h),         // 左上角，再远一点（附近都被别的框占了时）
+            PointF(c.right + g, c.bottom + g),             // 右下（在扇形里，实在没地方才用）
         )
         val grid = cv.inkGrid(pi)
         val pad = 8 * unit
@@ -487,11 +570,20 @@ object PopupPlacer {
             val score = 10f * overlap(r, c) +
                 3f * handZone(r, c, viewW) +
                 1.5f * density(cv, pi, r, grid) +
+                8f * covered(r, avoid) +
                 0.8f * hypot(r.centerX() - c.centerX(), r.centerY() - c.centerY()) / viewW
             if (score < bestScore) { bestScore = score; best = PointF(x, y) }
         }
         val p = best ?: PointF(pad, pad)
         return cv.toPage(pi, p.x, p.y)
+    }
+
+    /** r 被已经开着的回答框盖住的比例。 */
+    private fun covered(r: RectF, others: List<RectF>): Float {
+        var area = 0f
+        val i = RectF()
+        for (o in others) if (i.setIntersect(r, o)) area += i.width() * i.height()
+        return min(1f, area / max(1f, r.width() * r.height()))
     }
 
     /** r 盖住圈的面积占圈的比例。 */
@@ -598,6 +690,16 @@ class ToolIcon(ctx: Context, private val kind: Int, private val arg: Int = 0) : 
                 fill.color = Colors.INK
                 c.drawCircle(16f, 9f, 1.6f, fill)
             }
+            ERASER -> {   // 斜放的一块橡皮，左边是粉色的擦头
+                c.save()
+                c.rotate(-35f, 12f, 12f)
+                fill.color = 0xFFF4B6C2.toInt()
+                c.drawRoundRect(RectF(4.6f, 8.6f, 10.5f, 15.4f), 1.6f, 1.6f, fill)
+                path.addRoundRect(RectF(4f, 8f, 20f, 16f), 2.2f, 2.2f, Path.Direction.CW)
+                path.moveTo(10.5f, 8f); path.lineTo(10.5f, 16f)
+                c.drawPath(path, stroke)
+                c.restore()
+            }
             MOVE -> {   // 四向箭头
                 path.moveTo(12f, 3f); path.lineTo(12f, 21f); path.moveTo(3f, 12f); path.lineTo(21f, 12f)
                 path.moveTo(9f, 6f); path.lineTo(12f, 3f); path.lineTo(15f, 6f)
@@ -619,6 +721,7 @@ class ToolIcon(ctx: Context, private val kind: Int, private val arg: Int = 0) : 
         const val CIRCLE = 5
         const val MOVE = 6
         const val IMAGE = 7
+        const val ERASER = 8
         private val WIDTH_ICON = floatArrayOf(1.2f, 2.2f, 4f)
         private const val SELECTED_BG = 0xFFDCE5FF.toInt()
     }
