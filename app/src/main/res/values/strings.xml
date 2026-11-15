@@ -175,7 +175,7 @@
     <string name="on">开</string>
     <string name="off">关</string>
     <string name="write_hand">AI 的字迹</string>
-    <string name="hand_long">手写体（龙藏体）</string>
+    <string name="hand_song">宋体</string>
     <string name="hand_standard">标准体</string>
     <string name="write_sample">在的。① x² = 4 ⇒ x = ±2</string>
 

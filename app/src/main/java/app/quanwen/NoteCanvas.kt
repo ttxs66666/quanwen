@@ -1054,6 +1054,11 @@ class NoteCanvas(
         glyphPaint.typeface = AiInk.typeface(context, g.font)
         glyphPaint.textSize = g.size
         glyphPaint.color = g.color
+        // 第 17 版龙藏体写下的旧字：宋体更宽，横向压到原来的宽度，免得挤在一起
+        glyphPaint.textScaleX = if (g.font == AiInk.LEGACY_HAND) {
+            val m = glyphPaint.measureText(g.ch)
+            if (m > g.w && m > 0f) g.w / m else 1f
+        } else 1f
         if (g.rot != 0f) {
             cv.save()
             cv.rotate(g.rot, g.x + g.w / 2, g.y - g.size * 0.35f)

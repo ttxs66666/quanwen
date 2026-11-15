@@ -39,7 +39,7 @@
   - 第 15 版起可以插入图片：工具栏的「插入图片」可以从相册或文件里选，图片贴在当前这页中间，AI 圈题时也能看到图里的内容。
   - 第 16 版起：每圈一次开一个回答框，以前的框不会自己关，点 × 才关，下次打开笔记本还在。工具栏有橡皮擦，划过哪里擦哪里，三档大小（拿着橡皮时，粗细按钮就是橡皮大小）；笔尾的橡皮头也能擦。长按图片可以删除或移动。
   - 第 17 版起可以双指缩放（0.5 到 4 倍），放大后写的字和别处一样粗细（笔的粗细按纸算）；工具栏的「复位」一下回到铺满屏宽。
-  - **一同书写**（第 17 版，测试功能）：在设置页「测试功能」或笔记本工具栏里打开。打开后不用圈：写下问号（？），停笔 1 秒，AI 就把回答用字直接写在纸上，接在你的问题后面，字的大小、行首、行距照着你写的那一行来。问题不明确时 AI 会另起一行问你；你在纸上写下回答、以句号（。）结尾，它的询问会化成粒子飘散，然后重新回答。AI 的字可以用橡皮擦掉。字迹有手写体（龙藏体）和标准体两种。
+  - **一同书写**（第 17 版，测试功能）：在设置页「测试功能」或笔记本工具栏里打开。打开后不用圈：写下问号（？），停笔 1 秒，AI 就把回答用字直接写在纸上，接在你的问题后面，字比你写的小一半，底边和你这一行对齐，换行从你这一行的行首写。问题不明确时 AI 会另起一行问你；你在纸上写下回答、以句号（。）结尾，它的询问会化成粒子飘散，然后重新回答。AI 的字可以用橡皮擦掉。字体有宋体（第 18 版起，默认）和标准体两种。
   - 分屏，一半笔记、一半圈问。点圈题页的「截屏」，圈问会截下笔记那一半（自动去掉圈问自己那半屏），截图只临时用，不存相册。也可以用系统截屏，圈问会自动载入最新截图。
   - 也可以把截图（或别的 App 里的图片）直接拖进圈问；还可以从相册选图、粘贴，或者拍一张纸质笔记来圈。
   - 双指可以缩放。长按桌面图标有「圈最新截图」「拍照圈题」两个快捷方式。
@@ -76,7 +76,7 @@
 ### 许可证
 
 - 版权归 ttxs66666 所有。
-- 「一同书写」的手写体用的是 [龙藏体 Long Cang](https://github.com/googlefonts/longcang)，SIL Open Font License 1.1，许可证随附在 app/src/main/assets/fonts/LongCang-OFL.txt。
+- 「一同书写」的宋体用的是 [思源宋体 Noto Serif SC](https://github.com/notofonts/noto-cjk)（只留了 GB2312 的字和常用符号），SIL Open Font License 1.1，许可证随附在 app/src/main/assets/fonts/NotoSerifSC-OFL.txt。
 - 本项目以 [PolyForm Noncommercial 1.0.0](LICENSE) 许可证发布：可以免费用于学习、个人使用、研究和其他非商业用途，也可以修改；商业用途需要另行取得授权。
 - 内置的 [KaTeX](https://katex.org) 使用 MIT 许可证，见 `app/src/main/assets/katex/LICENSE`。
 
@@ -117,7 +117,7 @@ The point: you ask the questions and do the reasoning; the AI only nudges you wh
   - From version 15 you can insert pictures: Insert picture in the toolbar picks one from the gallery or from files and places it in the middle of the current page; the AI can read it when you circle part of it.
   - From version 16: each circle opens its own answer box; earlier boxes stay until you tap ×, even after you leave and reopen the notebook. The toolbar has an eraser that rubs out whatever it passes over, in three sizes (while it's on, the width buttons set its size); a pen's eraser end works too. Long-press a picture to delete or move it.
   - From version 17 you can pinch to zoom (0.5× to 4×). Pen thickness is measured on the paper, so writing done while zoomed in matches the rest of the page; Reset zoom in the toolbar returns to fit-width.
-  - **Write together** (version 17, experimental): turn it on under Experimental in settings or from the notebook toolbar. Then there is no circling: write a question mark (?) and pause for 1 second, and the AI writes its answer right on the page after your question, matching your character size, line start and line spacing. If the question is unclear, the AI asks on a new line; write your answer on the page and end it with a full stop (。), its question dissolves into particles, and it answers again. You can erase the AI's writing. Its handwriting can be Handwriting (Long Cang) or Standard.
+  - **Write together** (version 17, experimental): turn it on under Experimental in settings or from the notebook toolbar. Then there is no circling: write a question mark (?) and pause for 1 second, and the AI writes its answer right on the page after your question, at half the size of your writing, sitting on your line and wrapping back to the start of your line. If the question is unclear, the AI asks on a new line; write your answer on the page and end it with a full stop (。), its question dissolves into particles, and it answers again. You can erase the AI's writing. Its font can be Song (serif, the default from version 18) or Standard.
   - Split the screen with notes on one half and Quanwen on the other. Tap Screenshot on the circle page and Quanwen captures the notes half (cropping out its own half); the capture is temporary and never saved to the gallery. A system screenshot also works: Quanwen loads the latest one automatically.
   - You can also drag a screenshot (or an image from another app) straight into Quanwen, pick one from the gallery, paste one, or photograph paper notes.
   - Pinch to zoom. Long-press the launcher icon for the "Circle latest screenshot" and "Circle a photo" shortcuts.
@@ -154,6 +154,6 @@ The point: you ask the questions and do the reasoning; the AI only nudges you wh
 ### License
 
 - Copyright (c) 2026 ttxs66666.
-- The Write together handwriting uses [Long Cang](https://github.com/googlefonts/longcang) under the SIL Open Font License 1.1; its license is in app/src/main/assets/fonts/LongCang-OFL.txt.
+- The Write together Song font is [Noto Serif SC](https://github.com/notofonts/noto-cjk) (subset to GB2312 plus common symbols) under the SIL Open Font License 1.1; its license is in app/src/main/assets/fonts/NotoSerifSC-OFL.txt.
 - Released under the [PolyForm Noncommercial License 1.0.0](LICENSE): free for study, personal use, research and other noncommercial purposes, including modification; commercial use requires a separate license.
 - The bundled [KaTeX](https://katex.org) is MIT-licensed; see `app/src/main/assets/katex/LICENSE`.

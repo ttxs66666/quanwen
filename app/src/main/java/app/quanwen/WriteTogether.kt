@@ -11,7 +11,6 @@ import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.random.Random
 
 /**
  * 「一同书写」（测试功能）：在笔记本里写下问号就是在问 AI，AI 把回答用字直接写在纸上，接在问题后面。
@@ -23,25 +22,28 @@ import kotlin.random.Random
  */
 object AiInk {
     const val STANDARD = 0
-    const val HAND = 1
+    /** 第 17 版的龙藏体（朋友嫌丑，第 18 版去掉了）。这样写下的旧字改用宋体显示，横向压到原来的宽度，免得挤在一起。 */
+    const val LEGACY_HAND = 1
+    /** 宋体（思源宋体 Noto Serif SC，只留了 GB2312 的字和常用符号）。 */
+    const val SONG = 2
     /** AI 的字：墨绿色，和他的黑红蓝三支笔分开。 */
     const val INK = 0xFF1D6B50.toInt()
     /** AI 在问他：琥珀色。 */
     const val ASK = 0xFFB0700A.toInt()
 
-    private var hand: Typeface? = null
+    private var song: Typeface? = null
 
     fun typeface(ctx: Context, font: Int): Typeface {
-        if (font != HAND) return Typeface.DEFAULT
-        hand?.let { return it }
-        val t = try { Typeface.createFromAsset(ctx.assets, "fonts/LongCang-Regular.ttf") } catch (_: Exception) { Typeface.DEFAULT }
-        hand = t
+        if (font == STANDARD) return Typeface.DEFAULT
+        song?.let { return it }
+        val t = try { Typeface.createFromAsset(ctx.assets, "fonts/NotoSerifSC-Regular-sub.ttf") } catch (_: Exception) { Typeface.SERIF }
+        song = t
         return t
     }
 
-    /** 汉字从基线往上占字号的多少、往下占多少（量过字体：龙藏体「中」在 -0.10..0.70，系统黑体约 -0.07..0.81）。 */
-    fun top(font: Int) = if (font == HAND) 0.74f else 0.84f
-    fun bottom(font: Int) = if (font == HAND) 0.12f else 0.09f
+    /** 汉字从基线往上占字号的多少、往下占多少（量过字体：思源宋体「中」在 -0.08..0.84，系统黑体约 -0.07..0.81）。 */
+    fun top(font: Int) = if (font == STANDARD) 0.84f else 0.86f
+    fun bottom(font: Int) = if (font == STANDARD) 0.09f else 0.10f
     /** 汉字的高度是字号的多少倍。 */
     fun height(font: Int) = top(font) + bottom(font) - 0.06f
 }
@@ -167,13 +169,16 @@ class InkPlan(
 
     companion object {
         const val RIGHT_MARGIN = 24f
+        /** AI 的字是他手写字的几分之几大。 */
+        const val SIZE_RATIO = 0.5f
 
         fun fromJson(o: JSONObject, page: Int) = InkPlan(page, o.getDouble("size").toFloat(), o.getDouble("pitch").toFloat(),
             o.getDouble("left").toFloat(), o.getDouble("first").toFloat(), o.getDouble("base").toFloat(), o.getDouble("right").toFloat())
 
         /**
-         * 照着他写的那一行排：字高 = 问号所在这一行笔画的高度（夹在问号高度的 0.85–1.7 倍之间），
-         * 行首 = 从问号往左连着的同一行笔画的最左边，行距 = 他这几行的间距（只有一行就 1.6 倍字高）。
+         * 照着他写的那一行排：他的字高 = 问号所在这一行笔画的高度（夹在问号高度的 0.85–1.7 倍之间），
+         * AI 的字只有他的一半大（朋友试过，和手写一样大显得太大）；字的底边和他这一行的底边对齐。
+         * 行首 = 从问号往左连着的同一行笔画的最左边；AI 自己的几行之间按它的字号排得紧凑一些（1.6 倍字号）。
          */
         fun plan(page: NotePage, pi: Int, block: List<Stroke>, q: Punct.Box, font: Int): InkPlan {
             val qH = max(q.h, 8f)
@@ -185,7 +190,7 @@ class InkPlan(
             var top = q.t; var bottom = q.b
             for (s in line) { top = min(top, s.box[1]); bottom = max(bottom, s.box[3]) }
             val charH = (bottom - top).coerceIn(qH * 0.85f, qH * 1.7f)
-            val size = (charH / AiInk.height(font) * 0.95f).coerceIn(10f, 90f)
+            val size = (charH / AiInk.height(font) * 0.95f * SIZE_RATIO).coerceIn(7f, 60f)
             val baseline = bottom - AiInk.bottom(font) * size * 0.8f
             // 行首：从问号往左，隔得不远的同一行笔画
             var left = q.l
@@ -193,13 +198,7 @@ class InkPlan(
                 if (s.box[2] > q.r) continue
                 if (s.box[2] >= left - 2.5f * charH) left = min(left, s.box[0])
             }
-            // 行距：这一块里有几行就量出来
-            val centers = block.map { (it.box[1] + it.box[3]) / 2 }.sorted()
-            val rows = ArrayList<Float>()
-            for (c in centers) if (rows.isEmpty() || c - rows.last() > 0.6f * charH) rows.add(c)
-            val pitch = if (rows.size >= 2) ((rows.last() - rows.first()) / (rows.size - 1)).coerceIn(1.25f * charH, 2.4f * charH)
-            else 1.7f * charH
-            return InkPlan(pi, size, pitch, left, q.r + 0.35f * charH, baseline, NotePaper.PAGE_W - RIGHT_MARGIN)
+            return InkPlan(pi, size, 1.6f * size, left, q.r + 0.3f * charH, baseline, NotePaper.PAGE_W - RIGHT_MARGIN)
         }
     }
 }
@@ -241,7 +240,6 @@ class InkWriter(
     /** 刚写了「①」「1.」这样的序号：下一个字的位置就是这一段换行后对齐的地方。 */
     private var markerPending = false
     private val size = plan.size
-    private val rnd = Random(group.hashCode())
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = AiInk.typeface(canvas.context, font); textSize = size
     }
@@ -342,28 +340,15 @@ class InkWriter(
         paraStart = false
     }
 
-    /**
-     * 西文字母和数字放大一点：龙藏体的字母、数字比汉字小得多（数字约半个字高），
-     * 手写的数字却和汉字差不多高，不放大看起来像小一号。
-     */
-    private fun latinScale(ch: String) =
-        if (ch.length == 1 && ch[0].code < 0x80 && ch[0].isLetterOrDigit()) (if (font == AiInk.HAND) 1.35f else 1.06f) else 1f
-
     /** 这个字占多宽。 */
-    private fun adv(ch: String) = paint.measureText(ch) * latinScale(ch)
+    private fun adv(ch: String) = paint.measureText(ch)
 
-    /** 写一个字。手写体每个字大小、角度、高低稍微不一样，看起来像手写。 */
+    /** 写一个字：工工整整，不做手写的随机抖动。 */
     private fun glyph(ch: String) {
-        val k = latinScale(ch)
         val cw = adv(ch)
-        val hand = font == AiInk.HAND
-        val jitter = if (hand) 0.96f + rnd.nextFloat() * 0.08f else 1f
-        val sz = size * k * jitter
-        val rot = if (hand) (rnd.nextFloat() - 0.5f) * 4f else 0f
-        val dy = if (hand) (rnd.nextFloat() - 0.5f) * 0.06f * size else 0f
-        canvas.addGlyph(pi, NoteGlyph(ch, x, base + dy, sz, rot, if (inAsk) AiInk.ASK else AiInk.INK, font,
-            if (inAsk) askGroup else group, cw * jitter))
-        x += cw * (if (hand) 0.98f + rnd.nextFloat() * 0.05f else 1f)
+        canvas.addGlyph(pi, NoteGlyph(ch, x, base, size, 0f, if (inAsk) AiInk.ASK else AiInk.INK, font,
+            if (inAsk) askGroup else group, cw))
+        x += cw
         lineStart = false
     }
 

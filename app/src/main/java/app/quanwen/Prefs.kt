@@ -87,9 +87,9 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("writeTogether", false)
         set(v) = sp.edit().putBoolean("writeTogether", v).apply()
 
-    /** 「一同书写」里 AI 的字迹：[AiInk.STANDARD] 标准体，[AiInk.HAND] 手写体（龙藏体）。 */
+    /** 「一同书写」里 AI 的字迹：[AiInk.STANDARD] 标准体，[AiInk.SONG] 宋体。 */
     var aiHand: Int
-        get() = sp.getInt("aiHand", AiInk.HAND)
+        get() = sp.getInt("aiHand", AiInk.SONG).let { if (it == AiInk.LEGACY_HAND) AiInk.SONG else it }   // 第 17 版存的是龙藏体
         set(v) = sp.edit().putInt("aiHand", v).apply()
 
     /** 笔记本里橡皮擦的大小档位（0..2）。 */

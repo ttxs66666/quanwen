@@ -237,7 +237,7 @@ class MainActivity : Activity() {
             text = getString(R.string.write_sample); textSize = 22f; setTextColor(AiInk.INK)
             typeface = AiInk.typeface(this@MainActivity, prefs.aiHand)
         }
-        col.addView(choice(listOf(AiInk.HAND.toString() to getString(R.string.hand_long), AiInk.STANDARD.toString() to getString(R.string.hand_standard)),
+        col.addView(choice(listOf(AiInk.SONG.toString() to getString(R.string.hand_song), AiInk.STANDARD.toString() to getString(R.string.hand_standard)),
             prefs.aiHand.toString()) {
             prefs.aiHand = it.toInt()
             sample.typeface = AiInk.typeface(this, prefs.aiHand)
