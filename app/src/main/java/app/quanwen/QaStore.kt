@@ -15,10 +15,16 @@ class Turn(
     var responseId: String? = null,
     var state: Int = STATE_LOADING,
     var error: String? = null,
+    /** 这一轮发给模型的文字（第一轮除外，第一轮的在 [Qa.firstText]）。换了别家接口时，用它把前面的对话重发一遍。 */
+    val prompt: String = "",
+    /** 这一轮另外发给模型的图片（「一同书写」回答询问时的整页和放大图）。 */
+    var images: List<String> = emptyList(),
+    /** 这一轮是哪一家回答的（[Provider.id]）。OpenAI 的 response id 只有同一家才接得上。 */
+    var via: String = "",
 ) {
     fun toJson() = JSONObject().put("kind", kind).put("question", question).put("imagePath", imagePath).put("text", text).put("raw", raw)
         .put("responseId", responseId ?: "").put("state", if (state == STATE_DONE) STATE_DONE else STATE_ERROR)
-        .put("error", error ?: "")
+        .put("error", error ?: "").put("prompt", prompt).put("images", JSONArray(images)).put("via", via)
 
     companion object {
         const val KIND_FIRST = "first"
@@ -39,6 +45,9 @@ class Turn(
             responseId = o.optString("responseId").ifBlank { null },
             state = o.optInt("state", STATE_DONE),
             error = o.optString("error").ifBlank { null },
+            prompt = o.optString("prompt"),
+            images = o.optJSONArray("images")?.let { a -> (0 until a.length()).map { a.optString(it) }.filter { it.isNotBlank() } } ?: emptyList(),
+            via = o.optString("via"),
         )
     }
 }
@@ -62,15 +71,18 @@ class Qa(
 ) {
     val busy: Boolean get() = turns.any { it.state == Turn.STATE_LOADING || it.state == Turn.STATE_STREAMING }
 
-    /** 最近一轮成功回答的 response id，追问时接在它后面。 */
-    val lastResponseId: String? get() = turns.lastOrNull { it.state == Turn.STATE_DONE && it.responseId != null }?.responseId
+    /** 第一轮发给模型的文字（图片在 [QaStore] 的文件里）。追问时如果要把对话重发一遍就用它。 */
+    var firstText: String = ""
+
+    /** 有成功的回答，可以接着追问。 */
+    val canFollow: Boolean get() = turns.firstOrNull()?.state == Turn.STATE_DONE
 
     fun toJson(): JSONObject {
         val arr = JSONArray(); turns.forEach { arr.put(it.toJson()) }
         val b = JSONArray(); bounds.forEach { b.put(it.toDouble()) }
         return JSONObject().put("id", id).put("sessionId", sessionId).put("subject", subject)
             .put("time", time).put("lang", lang).put("type", type).put("title", title)
-            .put("bounds", b).put("turns", arr).put("origin", origin).put("book", book)
+            .put("bounds", b).put("turns", arr).put("origin", origin).put("book", book).put("firstText", firstText)
     }
 
     companion object {
@@ -91,6 +103,7 @@ class Qa(
             o.optJSONArray("turns")?.let { arr -> for (i in 0 until arr.length()) qa.turns.add(Turn.fromJson(arr.getJSONObject(i))) }
             qa.origin = o.optString("origin")
             qa.book = o.optString("book")
+            qa.firstText = o.optString("firstText")
             return qa
         }
     }
@@ -194,7 +207,10 @@ class QaStore(context: Context) {
     fun delete(qa: Qa) {
         list.remove(qa)
         File(dir, "${qa.id}.json").delete(); pageFile(qa).delete(); cropFile(qa).delete(); prevFile(qa).delete(); markFile(qa).delete()
-        qa.turns.forEach { t -> if (t.imagePath.isNotBlank()) File(t.imagePath).delete() }
+        qa.turns.forEach { t ->
+            if (t.imagePath.isNotBlank()) File(t.imagePath).delete()
+            t.images.forEach { File(it).delete() }
+        }
     }
 
     companion object {

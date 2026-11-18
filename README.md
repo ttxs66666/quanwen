@@ -27,7 +27,7 @@
 - 截图时悬浮条和卡片都会先隐藏，不会被截进去。
 - **追问**：回答卡片中间的「追问」，点开有三种方式。
   - ✍ 书写板：用笔把问题写下来，AI 直接看字迹，回答前先复述它认出的内容。
-  - 🎤 语音：说完点一下，用 OpenAI 转成文字；几乎没声音时不会发出去。
+  - 🎤 语音：说完点一下，用 OpenAI 转成文字（用别家时要另外填一个 OpenAI 密钥）；几乎没声音时不会发出去。
   - ⌨ 打字：在输入框里打字。
 - 回答卡片可以拖动，能显示 LaTeX 公式，能翻看这次学习里的其他回答。
 - **会话**：回答面板右上角的 ☰ 可以新建会话、切换会话。新圈的题只进当前会话，AI 也只参考当前会话里前面的问答，复习一门、再学另一门，互不干扰。
@@ -43,6 +43,9 @@
   - 分屏，一半笔记、一半圈问。点圈题页的「截屏」，圈问会截下笔记那一半（自动去掉圈问自己那半屏），截图只临时用，不存相册。也可以用系统截屏，圈问会自动载入最新截图。
   - 也可以把截图（或别的 App 里的图片）直接拖进圈问；还可以从相册选图、粘贴，或者拍一张纸质笔记来圈。
   - 双指可以缩放。长按桌面图标有「圈最新截图」「拍照圈题」两个快捷方式。
+- **多家 AI 服务**（第 19 版起）：设置页的「AI 服务」里可以选 OpenAI、DeepSeek、Claude、Gemini、通义千问、智谱 GLM、Kimi、豆包，也可以加自定义接口（中转站、本地模型等任何 OpenAI 兼容的接口）。每家的密钥、模型分开存，随时切换。
+  - **导入 API**：把密钥粘贴进去，圈问自己认出是哪一家、挑一个能看图的模型并测试；中转站可以把地址和密钥一起粘贴。
+  - 「选择…」会从这家的接口拉模型列表，标出哪些能看图。圈问要能看图的模型，「测试连接」会发一张小图确认。
 - 有历史记录，界面中英双语，应用内可以检查更新。
 
 ### 安装
@@ -52,13 +55,13 @@
    - **悬浮窗（推荐）**：点「开启悬浮窗」，允许「显示在其他应用上层」。第一次点「圈」时系统会问一次录屏授权，之后直接截屏；手机重启或录屏被停止后再问一次。不用开无障碍。
    - **无障碍**：点「打开无障碍设置」，把「圈问悬浮条」打开。如果开关是灰的，先点「应用信息」，在右上角菜单里选「允许受限设置」。有些手机清理后台时会把无障碍关掉，这种手机用悬浮窗方式更省事。
    - 两种都开不了（比如鸿蒙的卓易通），就用「App 内圈题」。
-3. 在设置页填入你自己的 OpenAI API Key，点「测试连接」。安装包里不带任何密钥。
+3. 在设置页点「AI 服务」，粘贴你自己的 API 密钥（OpenAI、DeepSeek 等都行）点「识别并导入」，或者点选厂商后填入密钥，再点「测试连接」。安装包里不带任何密钥。
 4. 以后在设置页点「检查更新」就能升级，本机保存的密钥和记录都不会丢。
 
 ### 隐私
 
 - 只有在你点「圈」的时候才会截屏。
-- 截图只发给你配置的 OpenAI 接口。
+- 截图只发给你在「AI 服务」里选的那一家。密钥只存在本机。
 - 历史记录只存在本机。
 
 ### 开发
@@ -105,7 +108,7 @@ The point: you ask the questions and do the reasoning; the AI only nudges you wh
 - The bar and card hide themselves before the screenshot, so they never appear in it.
 - **Ask a follow-up**: tap "Ask" in the middle of the answer card and pick one of three ways.
   - ✍ Write: write the question on a pad; the AI reads your handwriting and first repeats what it read.
-  - 🎤 Voice: talk, then tap when done; transcribed by OpenAI, and near-silent recordings are not sent.
+  - 🎤 Voice: talk, then tap when done; transcribed by OpenAI (when using another service, add an OpenAI key as well), and near-silent recordings are not sent.
   - ⌨ Type: type it in a text box.
 - The answer card is draggable, renders LaTeX, and lets you page through the other answers from the session.
 - **Sessions**: the ☰ button at the top right of the answer panel creates or switches sessions. New questions go into the current session, and the AI only builds on earlier questions from that session, so reviewing one subject and then studying another don't mix.
@@ -121,6 +124,9 @@ The point: you ask the questions and do the reasoning; the AI only nudges you wh
   - Split the screen with notes on one half and Quanwen on the other. Tap Screenshot on the circle page and Quanwen captures the notes half (cropping out its own half); the capture is temporary and never saved to the gallery. A system screenshot also works: Quanwen loads the latest one automatically.
   - You can also drag a screenshot (or an image from another app) straight into Quanwen, pick one from the gallery, paste one, or photograph paper notes.
   - Pinch to zoom. Long-press the launcher icon for the "Circle latest screenshot" and "Circle a photo" shortcuts.
+- **Multiple AI services** (from version 19): under AI service in settings, pick OpenAI, DeepSeek, Claude, Gemini, Qwen, Zhipu GLM, Kimi or Doubao, or add a custom endpoint (a relay, a local model, any OpenAI-compatible API). Each service keeps its own key and model, and you can switch any time.
+  - **Import API**: paste a key and Quanwen works out which service it's for, picks a model that reads images and tests it; for a relay, paste the address and the key together.
+  - Choose… fetches the service's model list and marks which models read images. Quanwen needs one that does, and Test connection sends a small image to check.
 - History, a Chinese/English interface, and in-app updates.
 
 ### Install
@@ -130,13 +136,13 @@ The point: you ask the questions and do the reasoning; the AI only nudges you wh
    - **Overlay (recommended)**: tap "Turn on overlay" and allow "Display over other apps". The first time you tap the circle button the system asks once for screen-capture permission; after that screenshots work directly, and it asks again after a restart or if capture was stopped. No accessibility needed.
    - **Accessibility**: tap "Accessibility settings" and turn on "Quanwen float bar". If the switch is greyed out, open App info and choose "Allow restricted settings" from the top-right menu. Some phones turn accessibility off when they clean up background apps; on those, overlay mode is easier.
    - If neither works (for example HarmonyOS with Zhuoyitong), use "Circle in the app".
-3. Enter your own OpenAI API key in Settings and tap "Test connection". The APK ships without any key.
+3. In Settings, open AI service and paste your own API key (OpenAI, DeepSeek and others work), then tap "Detect and import"; or pick a service and enter the key there, then tap "Test connection". The APK ships without any key.
 4. Later, tap "Check for updates" in Settings to upgrade. Your saved key and history stay on the device.
 
 ### Privacy
 
 - The screen is captured only when you tap the circle button.
-- Screenshots go only to the OpenAI endpoint you configured.
+- Screenshots go only to the service you picked under AI service. Keys stay on the device.
 - History stays on the device.
 
 ### Development

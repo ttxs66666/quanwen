@@ -247,13 +247,10 @@ class MarksActivity : Activity() {
         card.restore.visibility = View.GONE
         card.prompt.isEnabled = false
         val (instructions, input) = Prompts.optimizeMark(prefs.lang, card.letters.text.toString(), name, draft)
-        val body = JSONObject().put("model", prefs.model)
-            .put("instructions", instructions)
-            .put("input", input)
-            .put("reasoning", JSONObject().put("effort", prefs.effort))
+        val req = AiRequest(instructions, AiMsg.user(input), maxTokens = 1024)
         Thread {
             val sb = StringBuilder()
-            OpenAi(prefs.baseUrl, prefs.apiKey).stream(body, object : OpenAi.Listener {
+            AiClient(prefs.ai()).stream(req, object : AiClient.Listener {
                 override fun onDelta(text: String) {
                     sb.append(text)
                     val s = sb.toString()

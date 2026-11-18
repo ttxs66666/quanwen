@@ -482,7 +482,7 @@ class WriteTogether(
     private fun clarify(pi: Int, dot: Stroke) {
         val p = pending ?: return
         if (!stillThere(pi, dot)) return
-        if (p.qa.busy || p.qa.lastResponseId == null) return
+        if (p.qa.busy || !p.qa.canFollow) return
         val page = canvas.notePage(pi) ?: return
         pending = null; savePending()
         canvas.dissolveGroup(p.askGroup)

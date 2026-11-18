@@ -6,18 +6,17 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
-import android.text.InputType
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
-import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
-import org.json.JSONObject
 
-/** 设置页：笔记本、开悬浮条（悬浮窗或无障碍）、模式记号、语言、模型、历史记录入口。 */
+/** 设置页：笔记本、开悬浮条（悬浮窗或无障碍）、模式记号、语言、AI 服务、历史记录入口。 */
 class MainActivity : Activity() {
     private lateinit var prefs: Prefs
     private lateinit var col: LinearLayout
@@ -25,10 +24,9 @@ class MainActivity : Activity() {
     private lateinit var floatBtn: TextView
     /** 刚去系统设置里给「显示在其他应用上层」，回来就开悬浮窗。 */
     private var wantFloat = false
-    private lateinit var model: EditText
-    private lateinit var baseUrl: EditText
-    private lateinit var apiKey: EditText
-    private lateinit var testResult: TextView
+    private lateinit var aiIcon: ImageView
+    private lateinit var aiName: TextView
+    private lateinit var aiModel: TextView
     private lateinit var marksText: TextView
     private lateinit var updateBtn: TextView
     private lateinit var updateText: TextView
@@ -56,6 +54,16 @@ class MainActivity : Activity() {
         updateStatus()
         val marks = Marks.summary(prefs)
         marksText.text = if (marks.isEmpty()) getString(R.string.marks_now_none) else getString(R.string.marks_now, marks)
+        refreshAi()
+    }
+
+    /** 「AI 服务」卡片：正在用哪一家、哪个模型；没填密钥时提示去填。 */
+    private fun refreshAi() {
+        val cfg = prefs.ai()
+        aiIcon.setImageDrawable(ProviderIcon.of(cfg.provider))
+        aiName.text = cfg.provider.name(prefs.lang)
+        if (cfg.key.isBlank()) { aiModel.text = getString(R.string.ai_card_nokey); aiModel.setTextColor(Colors.ACCENT) }
+        else { aiModel.text = cfg.model; aiModel.setTextColor(Colors.MUTED) }
     }
 
     // ---------- 悬浮窗方式 ----------
@@ -83,13 +91,6 @@ class MainActivity : Activity() {
             updateStatus()
             if (FloatService.instance == null && QuanwenService.instance == null) Toast.makeText(this, R.string.float_failed, Toast.LENGTH_LONG).show()
         }, 1000)
-    }
-    override fun onPause() { super.onPause(); save() }
-
-    private fun save() {
-        prefs.model = model.text.toString()
-        prefs.baseUrl = baseUrl.text.toString()
-        prefs.apiKey = apiKey.text.toString()
     }
 
     // ---------- 检查更新 ----------
@@ -170,6 +171,12 @@ class MainActivity : Activity() {
         col.addView(text(getString(R.string.app_name), 30f, Colors.INK, bold = true))
         col.addView(text(getString(R.string.main_tagline), 15f, Colors.MUTED).apply { setPadding(0, dpi(4f), 0, dpi(12f)) })
         col.addView(row(button(getString(R.string.open_notes)) { ShelfActivity.open(this) }.apply { textSize = 16f }))
+
+        // AI 服务
+        section(getString(R.string.sec_ai))
+        col.addView(aiCard(), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            topMargin = dpi(2f); bottomMargin = dpi(4f)
+        })
         col.addView(View(this), LinearLayout.LayoutParams(1, dpi(12f)))
 
         // 悬浮条状态
@@ -247,24 +254,31 @@ class MainActivity : Activity() {
         // 语言
         section(getString(R.string.sec_lang))
         col.addView(choice(listOf("zh" to "中文", "en" to "English"), prefs.lang) { v ->
-            save(); prefs.lang = v
+            prefs.lang = v
             FloatHost.current?.refreshLabels()
             recreate()
         })
 
-        // 模型
-        section(getString(R.string.sec_model))
-        model = field(getString(R.string.model), prefs.model, Prefs.DEFAULT_MODEL)
-        col.addView(text(getString(R.string.effort), 13f, Colors.MUTED).apply { setPadding(0, dpi(6f), 0, dpi(4f)) })
-        col.addView(choice(listOf("low" to "low", "medium" to "medium", "high" to "high"), prefs.effort) { prefs.effort = it })
-        baseUrl = field(getString(R.string.base_url), prefs.baseUrl, BuildConfig.OPENAI_BASE_URL)
-        apiKey = field(getString(R.string.api_key), prefs.apiKey, getString(R.string.api_key_hint)).apply {
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+    }
+
+    /** 「AI 服务」卡片：点开去 [ProviderActivity] 换厂商、填密钥、选模型。 */
+    private fun aiCard(): View {
+        val card = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dpi(16f), dpi(14f), dpi(14f), dpi(14f))
+            background = rounded(0xFFFFFFFF.toInt(), dp(16f), 0x1A000000, dpi(1f))
+            elevation = dp(1.5f)
+            setOnClickListener { ProviderActivity.open(this@MainActivity) }
         }
-        col.addView(row(button(getString(R.string.test)) { testConnection() }))
-        testResult = text("", 13f, Colors.MUTED)
-        if (prefs.apiKey.isBlank()) { testResult.text = getString(R.string.no_key); testResult.setTextColor(Colors.ACCENT) }
-        col.addView(testResult)
+        aiIcon = ImageView(this)
+        card.addView(aiIcon, LinearLayout.LayoutParams(dpi(46f), dpi(46f)))
+        val t = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dpi(14f), 0, dpi(8f), 0) }
+        aiName = text("", 17f, Colors.INK, bold = true)
+        aiModel = text("", 13f, Colors.MUTED).apply { maxLines = 2; ellipsize = TextUtils.TruncateAt.END }
+        t.addView(aiName); t.addView(aiModel)
+        card.addView(t, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        card.addView(text(getString(R.string.ai_change), 14f, Colors.ACCENT, bold = true))
+        return card
     }
 
     private fun updateStatus() {
@@ -273,28 +287,6 @@ class MainActivity : Activity() {
         status.text = getString(when { a11y -> R.string.status_on_a11y; float -> R.string.status_on_float; else -> R.string.status_off })
         status.setTextColor(if (a11y || float) 0xFF2E7D4F.toInt() else Colors.ACCENT)
         floatBtn.text = getString(if (float) R.string.float_stop else R.string.float_start)
-    }
-
-    private fun testConnection() {
-        save()
-        testResult.text = getString(R.string.testing)
-        val m = prefs.model
-        val body = JSONObject().put("model", m)
-            .put("instructions", "Reply with exactly: ok")
-            .put("input", "ping")
-            .put("reasoning", JSONObject().put("effort", "low"))
-        val t0 = System.currentTimeMillis()
-        Thread {
-            val sb = StringBuilder()
-            OpenAi(prefs.baseUrl, prefs.apiKey).stream(body, object : OpenAi.Listener {
-                override fun onDelta(text: String) { sb.append(text) }
-                override fun onDone(responseId: String?) {
-                    val sec = (System.currentTimeMillis() - t0) / 1000.0
-                    runOnUiThread { testResult.text = getString(R.string.test_ok, m, sec) + "  “" + sb.toString().trim().take(40) + "”" }
-                }
-                override fun onError(message: String) { runOnUiThread { testResult.text = message } }
-            })
-        }.start()
     }
 
     // ---------- 简单的界面构件 ----------
@@ -306,16 +298,6 @@ class MainActivity : Activity() {
     private fun text(s: String, size: Float, color: Int, bold: Boolean = false) = TextView(this).apply {
         text = s; textSize = size; setTextColor(color)
         if (bold) paint.isFakeBoldText = true
-    }
-
-    private fun field(label: String, value: String, hint: String): EditText {
-        col.addView(text(label, 13f, Colors.MUTED).apply { setPadding(0, dpi(8f), 0, dpi(2f)) })
-        val e = EditText(this).apply {
-            setText(value); this.hint = hint; textSize = 15f; setSingleLine()
-            setTextColor(Colors.INK)
-        }
-        col.addView(e, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-        return e
     }
 
     private fun button(label: String, onClick: () -> Unit) = TextView(this).apply {

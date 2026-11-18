@@ -214,6 +214,8 @@ class AskInputView(
     }
 
     private fun startVoice() {
+        // 语音转文字只有 OpenAI 的接口能做：用别家时，要另外填过 OpenAI 的密钥
+        if (Providers.transcriber(Prefs(ctx)) == null) { ctx.say(loc.getString(R.string.voice_need_openai), long = true); return }
         if (!VoiceRecorder.hasPermission(ctx)) { MicPermissionActivity.open(ctx); return }
         if (!VoiceRecorder.start(ctx)) { toast(R.string.mic_failed); return }
         voiceState = 1
@@ -245,11 +247,11 @@ class AskInputView(
         }
         voiceState = 2
         voiceStatus.text = loc.getString(R.string.voice_working)
-        val prefs = Prefs(ctx)
+        val tr = Providers.transcriber(Prefs(ctx))
         // 提示里只放笔记本名（以前的题可能还有科目）：放题目的话，录音太轻时模型会把题目原样「认」出来
         val hint = Prompts.transcribeHint(qa.book.ifBlank { qa.subject }, "")
         Thread {
-            val text = try { VoiceRecorder.transcribe(prefs.baseUrl, prefs.apiKey, audio, hint) } catch (e: Exception) { null }
+            val text = try { tr?.let { VoiceRecorder.transcribe(it.first, it.second, audio, hint) } } catch (e: Exception) { null }
             post {
                 voiceState = 0
                 when {

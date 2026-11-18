@@ -163,7 +163,7 @@ class AnswerView(
 
     private fun openAsk() {
         val qa = current ?: return
-        if (qa.busy || qa.lastResponseId == null) return
+        if (qa.busy || !qa.canFollow) return
         footer.visibility = View.GONE
         askInput.visibility = View.VISIBLE
         askInput.open()
@@ -276,7 +276,7 @@ class AnswerView(
         posText.text = if (list.size > 1) "${i + 1}/${list.size}" else ""
         prevBtn.alpha = if (i > 0) 1f else 0.25f
         nextBtn.alpha = if (i in 0 until list.size - 1) 1f else 0.25f
-        val canFollow = !qa.busy && qa.lastResponseId != null
+        val canFollow = !qa.busy && qa.canFollow
         moreBtn.isEnabled = canFollow; revealBtn.isEnabled = canFollow
         moreBtn.alpha = if (canFollow) 1f else 0.4f; revealBtn.alpha = moreBtn.alpha
         askBtn.isEnabled = canFollow; askBtn.alpha = moreBtn.alpha

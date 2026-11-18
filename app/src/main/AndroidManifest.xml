@@ -34,6 +34,9 @@
         <activity android:name=".HistoryActivity" android:exported="false" />
         <activity android:name=".MarksActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" />
+        <!-- AI 服务：选厂商、填密钥、导入 API -->
+        <activity android:name=".ProviderActivity" android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
         <!-- 自带笔记本：书架和编辑页 -->
         <activity android:name=".ShelfActivity" android:exported="false" />
         <activity android:name=".NoteActivity" android:exported="false"

@@ -5,9 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.RectF
 import android.os.Handler
 import android.os.Looper
-import android.util.Base64
-import org.json.JSONArray
-import org.json.JSONObject
+import java.io.File
 import java.util.concurrent.Executors
 
 /**
@@ -84,30 +82,30 @@ object Engine {
     }
 
     /**
-     * 再提示一点 / 揭晓 / 追问：接在上一轮回答后面（previous_response_id），题目截图不用重发。
+     * 再提示一点 / 揭晓 / 追问：接在上一轮回答后面。
+     * OpenAI 用 previous_response_id 接上，题目截图不用重发；别家的接口不在服务器上记对话，就把前面的对话（连图片）一起发过去。
      * handwriting：手写追问的字迹图（JPEG），有的话和文字一起发给模型。
      */
     fun followUp(qa: Qa, kind: String, question: String = "", handwriting: ByteArray? = null, imagePath: String = "") {
-        if (qa.busy) return
-        val prev = qa.lastResponseId ?: return
+        if (qa.busy || !qa.canFollow) return
         val path = if (handwriting != null) store.saveAskImage(qa, handwriting) else imagePath
-        val turn = Turn(kind, question = question, imagePath = path)
-        qa.turns.add(turn)
-        notify(qa, false)
         val text = when (kind) {
             Turn.KIND_MORE -> Prompts.more(qa.lang)
             Turn.KIND_ASK -> if (path.isNotBlank() && question.isBlank()) Prompts.askHandwritten(qa.lang) else Prompts.ask(qa.lang, question)
             else -> Prompts.reveal(qa.lang)
         }
-        val body = baseBody(qa.lang)
-            .put("previous_response_id", prev)
-        val content = JSONArray().put(JSONObject().put("type", "input_text").put("text", text))
-        if (path.isNotBlank()) {
-            val bytes = handwriting ?: try { java.io.File(path).readBytes() } catch (_: Exception) { null }
-            if (bytes != null) content.put(image(bytes))
+        val prior = qa.turns.toList()
+        val turn = Turn(kind, question = question, imagePath = path, prompt = text)
+        qa.turns.add(turn)
+        notify(qa, false)
+        io.execute {
+            val parts = mutableListOf(AiPart.text(text))
+            if (path.isNotBlank()) {
+                val bytes = handwriting ?: try { File(path).readBytes() } catch (_: Exception) { null }
+                if (bytes != null) parts.add(AiPart.image(bytes))
+            }
+            send(qa, turn, Prompts.system(qa.lang), AiMsg.user(parts), prior)
         }
-        body.put("input", JSONArray().put(JSONObject().put("role", "user").put("content", content)))
-        io.execute { streamInto(qa, turn, body) }
     }
 
     // ---------- 「一同书写」 ----------
@@ -135,15 +133,8 @@ object Engine {
                     ImageUtil.jpeg(s).also { if (s !== p) s.recycle(); p.recycle() }
                 }
                 store.saveImages(qa, pj, cj, prev, null)
-                val content = JSONArray()
-                    .put(text(Prompts.writeFirstText(qa.lang, qa.book, history, prev != null, layout)))
-                    .put(image(pj))
-                    .put(text(Prompts.zoomLabel(qa.lang)))
-                    .put(image(cj))
-                if (prev != null) content.put(text(Prompts.prevPageLabel(qa.lang))).put(image(prev))
-                val body = baseBody(qa.lang, Prompts.writeSystem(qa.lang))
-                    .put("input", JSONArray().put(JSONObject().put("role", "user").put("content", content)))
-                streamInto(qa, turn, body)
+                qa.firstText = Prompts.writeFirstText(qa.lang, qa.book, history, prev != null, layout)
+                send(qa, turn, Prompts.writeSystem(qa.lang), firstMessage(qa, pj, cj, prev, null), emptyList())
             } catch (e: Exception) {
                 main.post { fail(qa, turn, e.toString()) }
             }
@@ -153,31 +144,25 @@ object Engine {
 
     /** 他在纸上回答了 AI 的询问（以句号结尾）：接着这道题的对话发过去，AI 重新回答。返回是否发出去了。 */
     fun clarifyWrite(qa: Qa, page: Bitmap, region: RectF, layout: String): Boolean {
-        if (qa.busy) return false
-        val prev = qa.lastResponseId ?: return false
-        val turn = Turn(Turn.KIND_ASK)
+        if (qa.busy || !qa.canFollow) return false
+        val text = Prompts.writeClarify(qa.lang, layout)
+        val prior = qa.turns.toList()
+        val turn = Turn(Turn.KIND_ASK, prompt = text)
         qa.turns.add(turn)
         notify(qa, false)
         io.execute {
             try {
                 val (pj, cj) = ImageUtil.prepareBox(page, region)
                 page.recycle()
-                val content = JSONArray()
-                    .put(text(Prompts.writeClarify(qa.lang, layout)))
-                    .put(image(pj))
-                    .put(image(cj))
-                val body = baseBody(qa.lang, Prompts.writeSystem(qa.lang))
-                    .put("previous_response_id", prev)
-                    .put("input", JSONArray().put(JSONObject().put("role", "user").put("content", content)))
-                streamInto(qa, turn, body)
+                // 存下来：换了别家接口、要把对话重发时还用得上
+                turn.images = listOf(store.saveAskImage(qa, pj), store.saveAskImage(qa, cj))
+                send(qa, turn, Prompts.writeSystem(qa.lang), AiMsg.user(listOf(AiPart.text(text), AiPart.image(pj), AiPart.image(cj))), prior)
             } catch (e: Exception) {
                 main.post { fail(qa, turn, e.toString()) }
             }
         }
         return true
     }
-
-    private fun text(s: String) = JSONObject().put("type", "input_text").put("text", s)
 
     fun retry(qa: Qa, index: Int) {
         if (qa.origin == Qa.ORIGIN_WRITE) return   // 「一同书写」的回答写在纸上，不在这里重试
@@ -203,36 +188,83 @@ object Engine {
     /** 后台线程。 */
     private fun runFirst(qa: Qa, turn: Turn, page: ByteArray, crop: ByteArray, prev: ByteArray?, mark: ByteArray?, history: String) {
         val notebook = qa.origin == Qa.ORIGIN_NOTE
-        val content = JSONArray()
-            .put(JSONObject().put("type", "input_text").put("text",
-                Prompts.firstTurnText(qa.lang, qa.book, history, notebook, hasPrev = prev != null)))
-            .put(image(page))
-            .put(JSONObject().put("type", "input_text").put("text", Prompts.zoomLabel(qa.lang)))
-            .put(image(crop))
-        if (prev != null) content
-            .put(JSONObject().put("type", "input_text").put("text", Prompts.prevPageLabel(qa.lang)))
-            .put(image(prev))
-        val modes = Marks.load(prefs)
-        if (mark != null && modes.isNotEmpty()) content   // 模式记号：每个记号是一段用户设好的提示词
-            .put(JSONObject().put("type", "input_text").put("text", Prompts.markText(qa.lang, modes)))
-            .put(image(mark))
-        val body = baseBody(qa.lang)
-            .put("input", JSONArray().put(JSONObject().put("role", "user").put("content", content)))
-        streamInto(qa, turn, body)
+        qa.firstText = Prompts.firstTurnText(qa.lang, qa.book, history, notebook, hasPrev = prev != null)
+        send(qa, turn, Prompts.system(qa.lang), firstMessage(qa, page, crop, prev, mark), emptyList())
     }
 
-    private fun image(bytes: ByteArray) = JSONObject().put("type", "input_image").put("detail", "high")
-        .put("image_url", "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP))
+    /** 第一轮发给模型的消息：说明文字 + 整页 + 圈内放大图（+ 上一页）（+ 模式记号）。 */
+    private fun firstMessage(qa: Qa, page: ByteArray, crop: ByteArray, prev: ByteArray?, mark: ByteArray?): AiMsg {
+        val parts = mutableListOf(
+            AiPart.text(qa.firstText), AiPart.image(page),
+            AiPart.text(Prompts.zoomLabel(qa.lang)), AiPart.image(crop),
+        )
+        if (prev != null) { parts.add(AiPart.text(Prompts.prevPageLabel(qa.lang))); parts.add(AiPart.image(prev)) }
+        if (qa.origin != Qa.ORIGIN_WRITE) {
+            val modes = Marks.load(prefs)
+            if (mark != null && modes.isNotEmpty()) {   // 模式记号：每个记号是一段用户设好的提示词
+                parts.add(AiPart.text(Prompts.markText(qa.lang, modes))); parts.add(AiPart.image(mark))
+            }
+        }
+        return AiMsg.user(parts)
+    }
 
-    private fun baseBody(lang: String, instructions: String = Prompts.system(lang)) = JSONObject()
-        .put("model", prefs.model)
-        .put("instructions", instructions)
-        .put("reasoning", JSONObject().put("effort", prefs.effort))
+    /** 从存下的文件重建第一轮的消息（后台线程）。 */
+    private fun storedFirst(qa: Qa): AiMsg {
+        fun read(f: File) = if (f.exists()) try { f.readBytes() } catch (_: Exception) { null } else null
+        val page = read(store.pageFile(qa))
+        val crop = read(store.cropFile(qa))
+        val prev = read(store.prevFile(qa))
+        if (qa.firstText.isBlank()) qa.firstText =   // 第 18 版及以前没存这段文字，按当时的写法重新生成
+            if (qa.origin == Qa.ORIGIN_WRITE) Prompts.writeFirstText(qa.lang, qa.book, "", prev != null, "")
+            else Prompts.firstTurnText(qa.lang, qa.book, "", qa.origin == Qa.ORIGIN_NOTE, hasPrev = prev != null)
+        if (page == null || crop == null) return AiMsg.user(qa.firstText)
+        return firstMessage(qa, page, crop, prev, read(store.markFile(qa)))
+    }
+
+    /** 某一轮追问发给模型的消息（后台线程）。 */
+    private fun turnMessage(qa: Qa, t: Turn): AiMsg {
+        val text = t.prompt.ifBlank {
+            when {
+                qa.origin == Qa.ORIGIN_WRITE -> Prompts.writeClarify(qa.lang, "")
+                t.kind == Turn.KIND_MORE -> Prompts.more(qa.lang)
+                t.kind == Turn.KIND_ASK -> if (t.imagePath.isNotBlank() && t.question.isBlank()) Prompts.askHandwritten(qa.lang) else Prompts.ask(qa.lang, t.question)
+                else -> Prompts.reveal(qa.lang)
+            }
+        }
+        val parts = mutableListOf(AiPart.text(text))
+        for (path in listOf(t.imagePath) + t.images) {
+            if (path.isBlank()) continue
+            try { parts.add(AiPart.image(File(path).readBytes())) } catch (_: Exception) { }
+        }
+        return AiMsg.user(parts)
+    }
+
+    /** 前面几轮的完整对话（只算答成功的轮次），给不在服务器上记对话的接口用（后台线程）。 */
+    private fun historyFor(qa: Qa, prior: List<Turn>): List<AiMsg> {
+        val out = mutableListOf<AiMsg>()
+        prior.forEachIndexed { i, t ->
+            if (t.state != Turn.STATE_DONE) return@forEachIndexed
+            out.add(if (i == 0) storedFirst(qa) else turnMessage(qa, t))
+            out.add(AiMsg.assistant(t.raw.ifBlank { t.text }))
+        }
+        return out
+    }
+
+    /** 后台线程：用当前这一家发出去。prior 是这一轮之前的轮次。 */
+    private fun send(qa: Qa, turn: Turn, system: String, latest: AiMsg, prior: List<Turn>) {
+        val cfg = prefs.ai()
+        turn.via = cfg.provider.id
+        // OpenAI 的上一轮记录只有同一家才接得上（第 18 版以前的都是 OpenAI 答的）
+        val last = prior.lastOrNull { it.state == Turn.STATE_DONE }
+        val previousId = last?.responseId?.takeIf { cfg.provider.protocol == Protocol.RESPONSES && last.via.ifBlank { Providers.OPENAI } == cfg.provider.id }
+        val req = AiRequest(system, latest, history = { historyFor(qa, prior) }, previousId = previousId)
+        streamInto(qa, turn, cfg, req)
+    }
 
     /** 后台线程。 */
-    private fun streamInto(qa: Qa, turn: Turn, body: JSONObject) {
+    private fun streamInto(qa: Qa, turn: Turn, cfg: AiConfig, req: AiRequest) {
         val sb = StringBuilder()
-        OpenAi(prefs.baseUrl, prefs.apiKey).stream(body, object : OpenAi.Listener {
+        AiClient(cfg).stream(req, object : AiClient.Listener {
             override fun onDelta(text: String) {
                 sb.append(text)
                 val snap = sb.toString()
